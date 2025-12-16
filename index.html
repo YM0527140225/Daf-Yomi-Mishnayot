@@ -1,0 +1,853 @@
+
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחולל לוחות לימוד</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <!-- SheetJS (Excel) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <!-- Hebcal (Hebrew Dates) -->
+    <script src="https://cdn.jsdelivr.net/npm/@hebcal/core@5.3.0/dist/bundle.min.js"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+      :root {
+        --print-width: 210mm;
+        --print-height: 297mm;
+        --excel-green: #107c41;
+        --selection-blue: rgba(59, 130, 246, 0.2);
+        --selection-border: #3b82f6;
+        --gold: #c5a059;
+        --dark-blue: #1e293b;
+      }
+
+      body {
+        font-family: 'Assistant', sans-serif;
+        background-color: #f8fafc;
+        margin: 0;
+        overflow-x: hidden;
+      }
+
+      /* --- WIZARD STYLES --- */
+      .hero-overlay {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 1rem;
+      }
+
+      .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        border-radius: 1.5rem;
+        padding: 3rem;
+        width: 100%;
+        max-width: 600px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .glass-card::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0; height: 6px;
+        background: linear-gradient(90deg, #c5a059, #fcd34d, #c5a059);
+      }
+
+      .title-serif {
+        font-family: 'Frank Ruhl Libre', serif;
+        color: var(--dark-blue);
+      }
+
+      .input-wrapper {
+        text-align: right;
+        margin-bottom: 1.5rem;
+      }
+
+      .input-label {
+        display: block;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 0.5rem;
+      }
+
+      .fancy-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        font-size: 1.1rem;
+        transition: all 0.2s;
+        background: white;
+      }
+      .fancy-input:focus {
+        border-color: var(--gold);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.2);
+      }
+
+      .generate-btn {
+        background: var(--dark-blue);
+        color: white;
+        font-size: 1.25rem;
+        font-weight: 700;
+        padding: 1rem 3rem;
+        border-radius: 50px;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      }
+      .generate-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px rgba(0,0,0,0.2);
+        background: #0f172a;
+      }
+      
+      .loader-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        gap: 1.5rem;
+        color: #475569;
+        background: #f8fafc;
+      }
+
+      /* --- EDITOR / WORKSPACE STYLES (Preserved) --- */
+      .toolbar {
+        background: white;
+        padding: 0.75rem 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #cbd5e1;
+        height: 70px;
+      }
+
+      .workspace {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2rem;
+        gap: 2rem;
+        min-height: calc(100vh - 70px);
+        overflow: auto;
+        /* Special background for the result view to make pages pop */
+        background-color: #52525b; 
+      }
+
+      .page-wrapper {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .page-label {
+        color: #e2e8f0; /* Lighter text on dark background */
+        font-weight: bold;
+        font-size: 0.875rem;
+        text-align: center;
+      }
+
+      .page-container {
+        width: var(--print-width); 
+        height: var(--print-height); 
+        background-color: white;
+        position: relative;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        user-select: none;
+        overflow: hidden;
+      }
+
+      .pdf-bg-img {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        object-fit: fill; 
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      .interaction-layer {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 10;
+      }
+
+      .interaction-layer.edit-mode {
+        cursor: crosshair;
+        background: rgba(0,0,0,0.05); 
+      }
+
+      .grid-container {
+        position: absolute;
+        border: 2px solid transparent;
+        transition: border 0.2s;
+        direction: rtl; 
+      }
+      .edit-mode .grid-container {
+        border: 2px dashed #3b82f6;
+        background: rgba(59, 130, 246, 0.1);
+        pointer-events: auto; 
+      }
+      .grid-container:hover .delete-btn { opacity: 1; }
+
+      .delete-btn {
+        position: absolute; top: -12px; right: -12px;
+        background: red; color: white;
+        border-radius: 50%; width: 24px; height: 24px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; opacity: 0; transition: opacity 0.2s;
+        z-index: 50; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+
+      .delete-page-btn {
+        position: absolute; top: 0; left: -40px;
+        background: #ef4444; color: white; padding: 8px;
+        border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .delete-page-btn:hover { background: #dc2626; }
+
+      .cell-input {
+        position: absolute;
+        background: transparent;
+        border: 1px solid transparent;
+        font-family: 'Assistant', sans-serif;
+        font-size: 7.5px; 
+        font-weight: 600; 
+        color: #000;
+        padding: 0; 
+        outline: none;
+        box-sizing: border-box;
+        text-align: right; 
+        white-space: nowrap;
+        overflow: hidden;
+        direction: rtl;
+        line-height: 1;
+      }
+      .show-borders .cell-input { border: 1px solid rgba(0,0,0,0.2) !important; }
+      .show-borders .cell-input:focus { border: 2px solid var(--excel-green) !important; }
+      .edit-mode .cell-input { border: 1px solid rgba(0,0,0,0.1); pointer-events: none; }
+      .view-mode .cell-input { pointer-events: auto; }
+
+      .selection-overlay { position: absolute; border: 2px solid var(--selection-border); background-color: var(--selection-blue); pointer-events: none; z-index: 40; }
+      .fill-handle { position: absolute; width: 8px; height: 8px; background-color: var(--selection-border); border: 1px solid white; bottom: -5px; left: -5px; cursor: crosshair; pointer-events: auto; z-index: 50; }
+      .fill-target-overlay { position: absolute; border: 2px dashed #64748b; background-color: rgba(100, 116, 139, 0.1); pointer-events: none; z-index: 39; }
+      .view-mode .cell-input:hover { border: 1px solid #94a3b8; background: rgba(255,255,255,0.8); z-index: 20; }
+      .view-mode .cell-input:focus { background: #ffffff; border: 2px solid var(--excel-green); z-index: 30; font-weight: bold; }
+      .selection-box { position: absolute; border: 2px solid var(--excel-green); background: rgba(16, 124, 65, 0.2); pointer-events: none; z-index: 100; }
+
+      .floating-toolbar {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 50px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        display: flex;
+        gap: 1rem;
+        z-index: 50;
+        border: 1px solid #e2e8f0;
+        animation: slideUp 0.5s ease-out;
+      }
+
+      .btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 999px; font-weight: 600; transition: all 0.2s; cursor: pointer; font-size: 0.95rem; border: none; }
+      .btn-primary { background: var(--dark-blue); color: white; }
+      .btn-primary:hover { background: #334155; }
+      .btn-secondary { background: #f1f5f9; color: #475569; }
+      .btn-secondary:hover { background: #e2e8f0; }
+
+      @media print {
+        @page { margin: 0; size: A4 portrait; }
+        body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .hero-overlay, .floating-toolbar, .delete-btn, .delete-page-btn, .selection-box, .no-print, .page-label, .selection-overlay, .fill-handle, .fill-target-overlay { display: none !important; }
+        .workspace { display: block; padding: 0; margin: 0; gap: 0; background: white; }
+        .page-wrapper { margin: 0; padding: 0; page-break-after: always; break-after: page; }
+        .page-container { box-shadow: none; margin: 0; width: 210mm; height: 297mm; transform: none !important; border: none; overflow: hidden; }
+        .page-wrapper:last-child { page-break-after: auto; }
+        .cell-input { border: none !important; background: transparent !important; }
+        .cell-input:placeholder-shown { display: none; }
+        .pdf-bg-img { display: block !important; width: 100% !important; height: 100% !important; }
+      }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+        const { HDate, gematriya } = window.hebcal;
+        
+        const uid = () => Math.random().toString(36).substr(2, 9);
+
+        // --- ICONS RENDER HELPER ---
+        const Icon = ({ name, size = 18, className = "" }) => {
+            const lucide = window.lucide;
+            if (!lucide || !lucide.icons || !lucide.icons[name]) return null;
+            const iconData = lucide.icons[name];
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    {iconData.map((child, index) => {
+                        const [tagName, attrs] = child;
+                        return React.createElement(tagName, { ...attrs, key: index });
+                    })}
+                </svg>
+            );
+        };
+
+        const App = () => {
+            const [pages, setPages] = useState([]);
+            
+            // --- UI STATES ---
+            // 'initial-loading': trying to load info.json
+            // 'wizard': showing input form
+            // 'result': showing the PDF with data
+            const [viewState, setViewState] = useState('initial-loading');
+            
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [processingMsg, setProcessingMsg] = useState("");
+            
+            const [mode, setMode] = useState('view'); 
+            const [data, setData] = useState({});
+            const [cellStyles, setCellStyles] = useState({});
+
+            const [showBorders, setShowBorders] = useState(false); 
+
+            // Canvas creation selection
+            const [selection, setSelection] = useState(null);
+            const [pendingTable, setPendingTable] = useState(null);
+            
+            // Cell selection & Fill Handle
+            const [cellSelection, setCellSelection] = useState(null);
+            const [isSelectingCells, setIsSelectingCells] = useState(false);
+            const [isFilling, setIsFilling] = useState(false);
+            const [fillTarget, setFillTarget] = useState(null);
+
+            const activePageRef = useRef(null);
+            const [newTableConfig, setNewTableConfig] = useState({ rows: 30, cols: 4 });
+
+            // --- WIZARD INPUTS ---
+            const [deceasedName, setDeceasedName] = useState("");
+            const today = new HDate();
+            const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+            const [selectedMonth, setSelectedMonth] = useState(today.getMonthName());
+            const [selectedDay, setSelectedDay] = useState(today.getDate());
+
+            // --- AUTO LOAD LOGIC ---
+            useEffect(() => {
+                const tryLoadTemplate = async () => {
+                    try {
+                        const response = await fetch('info.json');
+                        if (!response.ok) throw new Error("Template not found");
+                        const json = await response.json();
+                        loadJson(json);
+                        setViewState('wizard');
+                    } catch (err) {
+                        console.log("Auto-load failed or local mode:", err);
+                        setViewState('no-template');
+                    }
+                };
+                tryLoadTemplate();
+            }, []);
+
+            const loadJson = (json) => {
+                if (json.version === 2 && json.pages) { 
+                    setPages(json.pages); 
+                    setData(json.data || {}); 
+                    setCellStyles(json.styles || {});
+                } 
+                else if (json.bgImage && json.tables) { 
+                    setPages([{ id: uid(), pageNumber: 1, image: json.bgImage, tables: json.tables }]); 
+                    setData({}); 
+                    setCellStyles({});
+                } 
+                else {
+                    alert("פורמט לא נתמך");
+                }
+            };
+
+            const handleManualUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const json = JSON.parse(ev.target.result);
+                        loadJson(json);
+                        setViewState('wizard');
+                    } catch(err) { alert("קובץ לא תקין"); }
+                };
+                reader.readAsText(file);
+            };
+
+            // --- DATE LOGIC HELPERS ---
+            const isLeap = useMemo(() => {
+                try { return HDate.isLeapYear(parseInt(selectedYear)); } catch(e) { return false; }
+            }, [selectedYear]);
+
+            const availableMonths = useMemo(() => {
+                return [ "Tishrei", "Cheshvan", "Kislev", "Tevet", "Sh'vat", ...(isLeap ? ["Adar I", "Adar II"] : ["Adar"]), "Nisan", "Iyar", "Sivan", "Tamuz", "Av", "Elul" ];
+            }, [isLeap]);
+            
+            useEffect(() => {
+                if (!availableMonths.includes(selectedMonth)) {
+                    if (selectedMonth.includes("Adar")) setSelectedMonth(isLeap ? "Adar II" : "Adar"); 
+                    else setSelectedMonth(availableMonths[0]);
+                }
+            }, [selectedYear, isLeap]);
+
+            const years = Array.from({length: 20}, (_, i) => today.getFullYear() - 5 + i);
+            const formatHNum = (n) => { const map = {1:'א',2:'ב',3:'ג',4:'ד',5:'ה',6:'ו',7:'ז',8:'ח',9:'ט',10:'י',11:'יא',12:'יב',13:'יג',14:'יד',15:'טו',16:'טז',17:'יז',18:'יח',19:'יט',20:'כ',21:'כא',22:'כב',23:'כג',24:'כד',25:'כה',26:'כו',27:'כז',28:'כח',29:'כט',30:'ל'}; return map[n] || n; };
+            const monthHebrewDisplay = { "Nisan": "ניסן", "Iyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול", "Tishrei": "תשרי", "Cheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", "Sh'vat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'" };
+            const getYearStr = (y) => { if (typeof gematriya === 'function') return gematriya(y); try { return new HDate(1, "Tishrei", y).render('he').split(' ').pop().replace('הת',''); } catch(e) { return y; } };
+
+
+            // --- CORE GENERATOR LOGIC (EXACTLY AS PROVIDED IN THE ORIGINAL CODE) ---
+            const handleWizardSubmit = () => {
+                 try {
+                    const endDate = new HDate(parseInt(selectedDay), selectedMonth, parseInt(selectedYear));
+                    const newData = { ...data };
+                    const newStyles = { ...cellStyles };
+                    
+                    const stylesMap = {
+                        name: { fontSize: '13px', fontWeight: '800', textAlign: 'center' },
+                        month: { fontSize: '10px', fontWeight: '700', textAlign: 'center' },
+                        meta: { fontSize: '10px', fontWeight: '700', textAlign: 'center' }
+                    };
+
+                    const monthHebrewNames = {
+                        "Nisan": "ניסן", "Iyar": "אייר", "Iyyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול",
+                        "Tishrei": "תשרי", "Cheshvan": "חשוון", "MarCheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", 
+                        "Sh'vat": "שבט", "Shvat": "שבט", "Shevat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'"
+                    };
+
+                    // 1. Fill Name
+                    const findCells = (pattern) => {
+                        const matches = [];
+                        Object.entries(newData).forEach(([key, val]) => {
+                            if (String(val).match(pattern)) matches.push({ key, val });
+                        });
+                        return matches;
+                    };
+
+                    const nameCells = findCells(/\{\{Name of the deceased\}\}/i);
+                    nameCells.forEach(item => {
+                        newData[item.key] = deceasedName;
+                        newStyles[item.key] = stylesMap.name;
+                    });
+
+                    // 2. Identify Dates Logic
+                    let dateCells = [];
+                    const monthCells = []; 
+                    const cellMeta = {};
+                    
+                    pages.forEach((p, pIdx) => {
+                        p.tables.forEach(t => {
+                            for(let r=0; r<t.rows; r++) {
+                                for(let c=0; c<t.cols; c++) {
+                                    const key = `${t.id}_${r}_${c}`;
+                                    const val = newData[key];
+                                    cellMeta[key] = { pIdx, tY: t.y, r, c };
+                                    
+                                    if (val) {
+                                        const dateMatch = String(val).match(/\{\{date(\d+)\}\}/i);
+                                        if (dateMatch) dateCells.push({ key, group: parseInt(dateMatch[1]), ...cellMeta[key] });
+                                        
+                                        const monthMatch = String(val).match(/\{\{month(\d+)\}\}/i);
+                                        if (monthMatch) monthCells.push({ key, group: parseInt(monthMatch[1]) });
+                                    }
+                                }
+                            }
+                        });
+                    });
+
+                    // --- AUTO-FILL FALLBACK LOGIC ---
+                    if (dateCells.length === 0) {
+                        // In Wizard mode, we skip the "confirm" dialog and just do it if tags are missing
+                        // This fixes the issue where templates without tags showed up empty
+                        const allPotentialCells = [];
+                        pages.forEach((p, pIdx) => {
+                            p.tables.forEach(t => {
+                                for(let r=0; r<t.rows; r++) {
+                                    for(let c=0; c<t.cols; c++) {
+                                        const key = `${t.id}_${r}_${c}`;
+                                        // Simple check to ensure we don't overwrite name placeholders if they exist but were missed
+                                        if (!String(newData[key] || "").match(/\{\{Name|\{\{month/i)) {
+                                            allPotentialCells.push({ key, pIdx, tY: t.y, r, c });
+                                        }
+                                    }
+                                }
+                            });
+                        });
+
+                        // Sort spatially: Page -> Table Y -> Row -> Col DESC (RTL)
+                        allPotentialCells.sort((a, b) => {
+                            if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx;
+                            if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY;
+                            if (a.r !== b.r) return a.r - b.r;
+                            return b.c - a.c;
+                        });
+
+                        dateCells = allPotentialCells.map((c, idx) => ({ ...c, group: idx + 1 }));
+                    } else {
+                        dateCells.sort((a, b) => {
+                            if (a.group !== b.group) return a.group - b.group;
+                            if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx;
+                            if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY;
+                            if (a.r !== b.r) return a.r - b.r;
+                            return b.c - a.c; 
+                        });
+                    }
+
+                    const totalDays = dateCells.length;
+                    if (totalDays === 0) {
+                        alert("לא נמצאו טבלאות למילוי בתבנית.");
+                        return;
+                    }
+
+                    // Reverse Calculation
+                    let runningDate = endDate; 
+                    let startDate = null;
+                    const groupMonths = {}; 
+
+                    for (let i = dateCells.length - 1; i >= 0; i--) {
+                        const cell = dateCells[i];
+                        const dHeb = typeof gematriya === 'function' ? gematriya(runningDate.getDate()) : runningDate.getDate(); 
+                        const mName = runningDate.getMonthName();
+                        const mHeb = monthHebrewNames[mName] || mName;
+                        const formatted = `${dHeb} ${mHeb}`;
+                        
+                        newData[cell.key] = formatted;
+
+                        if (!groupMonths[cell.group]) groupMonths[cell.group] = new Set();
+                        groupMonths[cell.group].add(mHeb);
+
+                        if (i === 0) startDate = runningDate;
+                        runningDate = runningDate.prev();
+                    }
+
+                    // Fill Months
+                    monthCells.forEach(item => {
+                        const months = groupMonths[item.group];
+                        if (months && months.size > 0) {
+                            const mArray = Array.from(months).reverse();
+                            newData[item.key] = mArray.join(' - ');
+                            newStyles[item.key] = stylesMap.month;
+                        } else newData[item.key] = "";
+                    });
+
+                    // Fill Meta
+                    const formatFullDate = (d) => {
+                        const yHeb = typeof gematriya === 'function' ? gematriya(d.getFullYear()) : d.getFullYear();
+                        const dHeb = typeof gematriya === 'function' ? gematriya(d.getDate()) : d.getDate();
+                        const mName = d.getMonthName();
+                        const mHeb = monthHebrewNames[mName] || mName;
+                        return `${dHeb} ${mHeb} ${yHeb}`;
+                    };
+
+                    const startStr = formatFullDate(startDate);
+                    const endStr = formatFullDate(endDate);
+
+                    findCells(/\{\{start\}\}/i).forEach(c => { newData[c.key] = startStr; newStyles[c.key] = stylesMap.meta; });
+                    findCells(/\{\{end\}\}/i).forEach(c => { newData[c.key] = endStr; newStyles[c.key] = stylesMap.meta; });
+
+                    setData(newData);
+                    setCellStyles(newStyles);
+                    setViewState('result'); // Switch to result view
+                } catch (e) {
+                    console.error("Generator Error:", e);
+                    alert(`שגיאה ביצירת הלוח:\n${e.message}`);
+                }
+            };
+
+            // --- ALL HELPER FUNCTIONS (Preserved exactly as requested) ---
+            const handleKeyDown = (e, tableId, row, col, maxRows, maxCols) => {
+                let nextRow = row; let nextCol = col; let handled = false;
+                switch(e.key) {
+                    case 'ArrowUp': nextRow = row - 1; handled = true; break;
+                    case 'ArrowDown': nextRow = row + 1; handled = true; break;
+                    case 'ArrowLeft': nextCol = col + 1; handled = true; break;
+                    case 'ArrowRight': nextCol = col - 1; handled = true; break;
+                }
+                if (handled) {
+                    if (nextRow >= 0 && nextRow < maxRows && nextCol >= 0 && nextCol < maxCols) {
+                        e.preventDefault();
+                        const nextId = `${tableId}_${nextRow}_${nextCol}`;
+                        const el = document.getElementById(nextId);
+                        if (el) { el.focus(); setCellSelection({ tableId, startR: nextRow, startC: nextCol, endR: nextRow, endC: nextCol }); }
+                    }
+                }
+            };
+            const handleCellMouseDown = (e, tableId, r, c) => {
+                if (mode === 'edit') return;
+                if (e.shiftKey && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); } 
+                else { setCellSelection({ tableId, startR: r, startC: c, endR: r, endC: c }); setIsSelectingCells(true); }
+            };
+            const handleCellMouseEnter = (e, tableId, r, c) => {
+                if (isFilling && cellSelection && cellSelection.tableId === tableId) { setFillTarget({ endR: r, endC: c }); } 
+                else if (isSelectingCells && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); }
+            };
+            const handleFillHandleMouseDown = (e) => { e.stopPropagation(); e.preventDefault(); setIsFilling(true); setFillTarget({ endR: cellSelection.endR, endC: cellSelection.endC }); };
+            useEffect(() => {
+                const handleGlobalMouseUp = () => {
+                    if (isSelectingCells) setIsSelectingCells(false);
+                    if (isFilling) { applyFill(); setIsFilling(false); setFillTarget(null); }
+                };
+                window.addEventListener('mouseup', handleGlobalMouseUp); return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+            }, [isSelectingCells, isFilling, fillTarget, cellSelection, data]);
+            const applyFill = () => {
+                if (!fillTarget || !cellSelection) return;
+                const { tableId, startR, startC, endR: selEndR, endC: selEndC } = cellSelection;
+                const { endR: targetR, endC: targetC } = fillTarget;
+                const r1 = Math.min(startR, selEndR); const r2 = Math.max(startR, selEndR);
+                const c1 = Math.min(startC, selEndC); const c2 = Math.max(startC, selEndC);
+                const tr1 = Math.min(r1, targetR); const tr2 = Math.max(r2, targetR);
+                if (tr2 <= r2 && tr1 >= r1) return; 
+                const newData = { ...data };
+                for (let c = c1; c <= c2; c++) {
+                    const sourceValues = [];
+                    for(let r = r1; r <= r2; r++) sourceValues.push(data[`${tableId}_${r}_${c}`] || "");
+                    if (targetR > r2) {
+                        const count = targetR - r2;
+                        const nextVals = generateNextValues(sourceValues, count);
+                        nextVals.forEach((val, i) => { const row = r2 + 1 + i; newData[`${tableId}_${row}_${c}`] = val; });
+                    }
+                }
+                setData(newData); setCellSelection(prev => ({ ...prev, endR: Math.max(prev.endR, targetR), endC: Math.max(prev.endC, targetC) }));
+            };
+            const generateNextValues = (sequence, count) => {
+                const result = []; if (sequence.length === 0) return Array(count).fill("");
+                const isNumeric = (str) => !isNaN(parseFloat(str)) && isFinite(str); const parseNum = (str) => parseFloat(str);
+                if (sequence.every(isNumeric) && sequence.length > 1) {
+                    const nums = sequence.map(parseNum); const diff = nums[nums.length - 1] - nums[nums.length - 2];
+                    let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; last = Math.round(last * 100) / 100; result.push(String(last)); }
+                    return result;
+                }
+                const regex = /^(.*?)(\d+)$/; const matches = sequence.map(s => String(s).match(regex));
+                if (sequence.length > 1 && matches.every(m => m)) {
+                    const prefix = matches[0][1];
+                    if (matches.every(m => m[1] === prefix)) {
+                        const nums = matches.map(m => parseInt(m[2])); const diff = nums[nums.length - 1] - nums[nums.length - 2];
+                        let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; result.push(`${prefix}${last}`); }
+                        return result;
+                    }
+                }
+                for(let i=0; i<count; i++) result.push(sequence[i % sequence.length]); return result;
+            };
+
+            // Keep all the PDF handling and Table Detection for "Edit" mode if user needs it later
+            const detectTablesInCanvas = (canvas) => {
+                 const width = canvas.width; const height = canvas.height; const ctx = canvas.getContext('2d');
+                const imgData = ctx.getImageData(0, 0, width, height); const data32 = new Uint32Array(imgData.data.buffer);
+                const isDark = (val) => (val & 0xFF) < 180 && ((val >> 8) & 0xFF) < 180 && ((val >> 16) & 0xFF) < 180;
+                const MIN_H_LEN = width * 0.04; const MIN_V_LEN = height * 0.03;
+                let hLines = [], vLines = [];
+                for (let y = 0; y < height; y += 3) { let startX = -1; for (let x = 0; x < width; x++) { if (isDark(data32[y * width + x])) { if (startX === -1) startX = x; } else { if (startX !== -1) { if ((x - startX) > MIN_H_LEN) hLines.push({ y, x1: startX, x2: x }); startX = -1; } } } }
+                for (let x = 0; x < width; x += 3) { let startY = -1; for (let y = 0; y < height; y++) { if (isDark(data32[y * width + x])) { if (startY === -1) startY = y; } else { if (startY !== -1) { if ((y - startY) > MIN_V_LEN) vLines.push({ x, y1: startY, y2: y }); startY = -1; } } } }
+                 const mergeLines = (lines, isVertical) => { if (lines.length === 0) return []; lines.sort((a, b) => isVertical ? (a.x - b.x) : (a.y - b.y)); const merged = []; let curr = lines[0]; for (let i = 1; i < lines.length; i++) { const next = lines[i]; const diff = isVertical ? (next.x - curr.x) : (next.y - curr.y); const overlapStart = Math.max(isVertical ? curr.y1 : curr.x1, isVertical ? next.y1 : next.x1); const overlapEnd = Math.min(isVertical ? curr.y2 : curr.x2, isVertical ? next.y2 : next.x2); if (diff < 5 && (overlapEnd - overlapStart) > 0) { if (isVertical) { curr.y1 = Math.min(curr.y1, next.y1); curr.y2 = Math.max(curr.y2, next.y2); } else { curr.x1 = Math.min(curr.x1, next.x1); curr.x2 = Math.max(curr.x2, next.x2); } curr.thickness = (curr.thickness || 1) + diff; } else { if ((curr.thickness || 1) < 20) merged.push(curr); curr = next; } } if ((curr.thickness || 1) < 20) merged.push(curr); return merged; };
+                const cleanH = mergeLines(hLines, false); const cleanV = mergeLines(vLines, true); if (cleanH.length < 2 || cleanV.length < 2) return [];
+                const V_OFFSET = cleanH.length; const adj = new Array(cleanH.length + cleanV.length).fill(null).map(() => []);
+                cleanH.forEach((h, hIdx) => { cleanV.forEach((v, vIdx) => { if (v.x >= h.x1 - 5 && v.x <= h.x2 + 5 && h.y >= v.y1 - 5 && h.y <= v.y2 + 5) { adj[hIdx].push(V_OFFSET + vIdx); adj[V_OFFSET + vIdx].push(hIdx); } }); });
+                const visited = new Array(adj.length).fill(false); const foundTables = [];
+                for (let i = 0; i < adj.length; i++) { if (!visited[i] && adj[i].length > 0) { const componentH = []; const componentV = []; const queue = [i]; visited[i] = true; while (queue.length > 0) { const node = queue.pop(); if (node < V_OFFSET) componentH.push(cleanH[node]); else componentV.push(cleanV[node - V_OFFSET]); for (const neighbor of adj[node]) { if (!visited[neighbor]) { visited[neighbor] = true; queue.push(neighbor); } } } if (componentH.length >= 2 && componentV.length >= 2) { foundTables.push({ h: componentH, v: componentV }); } } }
+                const domWidth = 793.7; const domHeight = 1122.5; const scaleX = domWidth / width; const scaleY = domHeight / height;
+                return foundTables.map(tbl => { const minX = Math.min(...tbl.v.map(l => l.x)); const maxX = Math.max(...tbl.v.map(l => l.x)); const minY = Math.min(...tbl.h.map(l => l.y)); const maxY = Math.max(...tbl.h.map(l => l.y)); const uniqueY = tbl.h.map(l => l.y).sort((a,b)=>a-b).filter((y, i, arr) => i===0 || y - arr[i-1] > 10); const uniqueX = tbl.v.map(l => l.x).sort((a,b)=>a-b).filter((x, i, arr) => i===0 || x - arr[i-1] > 10); let rows = Math.max(1, uniqueY.length - 1); let cols = Math.max(1, uniqueX.length - 1); if (rows === 0) rows = uniqueY.length; if (cols === 0) cols = uniqueX.length; return { id: uid(), x: minX * scaleX, y: minY * scaleY, w: (maxX - minX) * scaleX, h: (maxY - minY) * scaleY, rows: rows, cols: cols }; });
+            };
+
+            const getCoords = (e, pageElem) => { const rect = pageElem.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; };
+            const handleMouseDown = (e, pageId) => { if (mode !== 'edit' || pendingTable) return; const pageElem = e.currentTarget; const { x, y } = getCoords(e, pageElem); activePageRef.current = pageId; setSelection({ startX: x, startY: y, currentX: x, currentY: y }); };
+            const handleMouseMove = (e) => { if (!selection) return; const pageElem = e.currentTarget; const { x, y } = getCoords(e, pageElem); setSelection(prev => ({ ...prev, currentX: x, currentY: y })); };
+            const handleMouseUp = () => { if (!selection) return; const x = Math.min(selection.startX, selection.currentX); const y = Math.min(selection.startY, selection.currentY); const w = Math.abs(selection.currentX - selection.startX); const h = Math.abs(selection.currentY - selection.startY); setSelection(null); if (w > 20 && h > 20 && activePageRef.current) setPendingTable({ pageId: activePageRef.current, x, y, w, h }); };
+            const confirmTable = () => { if (!pendingTable) return; setPages(prevPages => prevPages.map(p => { if (p.id !== pendingTable.pageId) return p; return { ...p, tables: [...p.tables, { id: uid(), x: pendingTable.x, y: pendingTable.y, w: pendingTable.w, h: pendingTable.h, rows: parseInt(newTableConfig.rows) || 10, cols: parseInt(newTableConfig.cols) || 4 }] }; })); setPendingTable(null); };
+            const deleteTable = (pageId, tableId) => { if (confirm("למחוק טבלה זו?")) setPages(prev => prev.map(p => { if (p.id !== pageId) return p; return { ...p, tables: p.tables.filter(t => t.id !== tableId) }; })); };
+            const deletePage = (pageId) => { if (confirm("האם למחוק את כל העמוד הזה?")) setPages(prev => prev.filter(p => p.id !== pageId)); };
+            const handleInputChange = (tableId, row, col, val) => { const key = `${tableId}_${row}_${col}`; setData(prev => ({ ...prev, [key]: val })); };
+
+            // --- RENDER ---
+            
+            // 1. Initial Loader
+            if (viewState === 'initial-loading') {
+                return (
+                    <div className="loader-container">
+                        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-600"></div>
+                        <p className="mt-4 font-bold text-slate-600">טוען נתונים...</p>
+                    </div>
+                );
+            }
+
+            // 2. Fallback: No Template Found (Simple Upload Screen)
+            if (viewState === 'no-template') {
+                 return (
+                    <div className="loader-container">
+                        <Icon name="FileX" size={64} className="text-slate-300 mb-4" />
+                        <h2 className="text-2xl font-bold mb-2">לא נמצאה תבנית</h2>
+                        <p className="text-slate-500 mb-6">אנא ודא שקובץ info.json נמצא בתיקייה, או טען ידנית.</p>
+                        <label className="btn btn-primary cursor-pointer px-6 py-3">
+                            <Icon name="Upload" />
+                            טען קובץ תבנית
+                            <input type="file" accept=".json" onChange={handleManualUpload} className="hidden" />
+                        </label>
+                    </div>
+                );
+            }
+
+            // 3. Wizard Screen
+            if (viewState === 'wizard') {
+                return (
+                    <div className="hero-overlay">
+                        <div className="glass-card fade-in">
+                            <div className="flex justify-center mb-6 text-yellow-600">
+                                <Icon name="Scroll" size={48} />
+                            </div>
+                            
+                            <h1 className="text-3xl font-bold title-serif mb-2">מחולל לוחות לימוד</h1>
+                            <p className="text-slate-500 mb-8">הזן את הפרטים ליצירת הלוח באופן אוטומטי</p>
+
+                            <div className="space-y-6">
+                                <div className="input-wrapper">
+                                    <label className="input-label">תאריך סיום הלימוד (יעד)</label>
+                                    <div className="flex gap-3">
+                                        <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">
+                                            {Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}
+                                        </select>
+                                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">
+                                            {availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}
+                                        </select>
+                                        <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">
+                                            {years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="input-wrapper">
+                                    <label className="input-label">הקדשה / שם המנוח (אופציונלי)</label>
+                                    <input 
+                                        type="text" 
+                                        className="fancy-input"
+                                        placeholder="לדוגמה: יוסף בן דוד ז״ל"
+                                        value={deceasedName}
+                                        onChange={e => setDeceasedName(e.target.value)}
+                                    />
+                                </div>
+
+                                <button onClick={handleWizardSubmit} className="generate-btn w-full justify-center mt-4">
+                                    <Icon name="Sparkles" />
+                                    צור לוח לימוד
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // 4. Result Screen (The Workspace)
+            return (
+                <div className={`min-h-screen flex flex-col ${showBorders ? 'show-borders' : ''}`}>
+                    {/* Simplified workspace without the complex toolbar */}
+                    <div className="workspace">
+                        {pages.map((page, index) => (
+                            <div key={page.id} className="page-wrapper">
+                                <div className="page-container">
+                                    <img src={page.image} className="pdf-bg-img" alt={`Page ${index+1}`} />
+                                    
+                                    <div className={`interaction-layer ${mode === 'edit' ? 'edit-mode' : 'view-mode'}`}>
+                                        {page.tables.map(t => {
+                                            const cellW = t.w / t.cols;
+                                            const cellH = t.h / t.rows;
+                                            const cells = [];
+                                            for(let r=0; r<t.rows; r++) {
+                                                for(let c=0; c<t.cols; c++) {
+                                                    const cellId = `${t.id}_${r}_${c}`;
+                                                    cells.push(
+                                                        <input 
+                                                            key={cellId} 
+                                                            id={cellId} 
+                                                            className="cell-input" 
+                                                            style={{
+                                                                right: `${c * cellW}px`, 
+                                                                top: `${r * cellH}px`, 
+                                                                width: `${cellW}px`, 
+                                                                height: `${cellH}px`,
+                                                                ...(cellStyles[cellId] || {})
+                                                            }} 
+                                                            value={data[cellId] || ""} 
+                                                            readOnly={mode !== 'edit'} 
+                                                            autoComplete="off" 
+                                                        />
+                                                    );
+                                                }
+                                            }
+                                            return (
+                                                <div key={t.id} className="grid-container" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` }}>
+                                                    {cells}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="floating-toolbar">
+                        <button onClick={() => window.print()} className="btn btn-primary">
+                            <Icon name="Printer" />
+                            הדפס / שמור כ-PDF
+                        </button>
+                        <div className="w-px bg-slate-200 mx-1"></div>
+                        <button onClick={() => setViewState('wizard')} className="btn btn-secondary">
+                            <Icon name="ArrowRight" />
+                            ערוך נתונים
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
