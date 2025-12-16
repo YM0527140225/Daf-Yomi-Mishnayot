@@ -76,6 +76,14 @@
         position: relative;
         overflow: hidden;
       }
+      
+      @media (max-width: 640px) {
+          .glass-card {
+              padding: 1.5rem;
+              max-height: 90vh;
+              overflow-y: auto;
+          }
+      }
 
       .glass-card::before {
         content: "";
@@ -183,7 +191,7 @@
         flex-direction: column;
         gap: 0.5rem;
       }
-
+      
       .page-label {
         color: #e2e8f0;
         font-weight: bold;
@@ -302,6 +310,34 @@
         border: 1px solid #e2e8f0;
         animation: slideUp 0.5s ease-out;
       }
+      
+      @media (max-width: 640px) {
+        .floating-toolbar {
+            width: 92%;
+            max-width: none;
+            padding: 0.4rem;
+            bottom: 1rem;
+            flex-wrap: nowrap;
+            justify-content: space-evenly;
+            gap: 0.25rem;
+        }
+        .floating-toolbar .w-px { display: none; }
+        .btn {
+            font-size: 0.75rem !important; /* Force smaller font */
+            padding: 0.5rem 0.4rem !important;
+            white-space: nowrap;
+            flex: 1;
+            justify-content: center;
+        }
+        .btn svg {
+            width: 14px; height: 14px;
+        }
+        .workspace {
+            padding: 0.5rem 0 !important;
+            overflow-x: hidden;
+            width: 100vw;
+        }
+      }
 
       .popover {
         position: absolute;
@@ -378,6 +414,9 @@
             
             const [data, setData] = useState({});
             const [cellStyles, setCellStyles] = useState({});
+            
+            // Dynamic scale for preview mode on mobile
+            const [previewScale, setPreviewScale] = useState(1);
 
             const [showBorders, setShowBorders] = useState(false); 
 
@@ -423,6 +462,25 @@
                     }
                 };
                 tryLoadTemplate();
+            }, []);
+            
+            // --- SCALE LISTENER FOR MOBILE ---
+            useEffect(() => {
+                const handleResize = () => {
+                    const width = window.innerWidth;
+                    // Standard A4 width is approx 794px. If screen is smaller, scale down.
+                    // We leave some margin (e.g. 20px).
+                    if (width < 800) {
+                        const scale = (width - 16) / 794; // 16px safety margin
+                        setPreviewScale(scale);
+                    } else {
+                        setPreviewScale(1);
+                    }
+                };
+                
+                window.addEventListener('resize', handleResize);
+                handleResize(); // Initial check
+                return () => window.removeEventListener('resize', handleResize);
             }, []);
 
             const loadJson = (json) => {
@@ -470,8 +528,8 @@
                     // UPDATED STYLES CONFIGURATION
                     const stylesMap = { 
                         name: { fontSize: '13px', fontWeight: '800', textAlign: 'center' }, 
-                        month: { fontSize: '10px', fontWeight: '700', textAlign: 'right' }, 
-                        meta: { fontSize: '10px', fontWeight: '700', textAlign: 'center' },
+                        month: { fontSize: '9px', fontWeight: '700', textAlign: 'right' }, 
+                        meta: { fontSize: '11px', fontWeight: '700', textAlign: 'center' },
                         date: { fontSize: '7.5px', fontWeight: '700', textAlign: 'right' }
                     };
                     
@@ -510,12 +568,12 @@
                         runningDate = runningDate.prev();
                     }
 
-                    // 3. Fill Months (Right align, 10px)
-                    monthCells.forEach(item => { const months = groupMonths[item.group]; if (months && months.size > 0) { newData[item.key] = Array.from(months).reverse().join(' - '); newStyles[item.key] = stylesMap.month; } else newData[item.key] = ""; });
+                    // 3. Fill Months (Right align, 9px, space prefix added here)
+                    monthCells.forEach(item => { const months = groupMonths[item.group]; if (months && months.size > 0) { newData[item.key] = " " + Array.from(months).reverse().join(' - '); newStyles[item.key] = stylesMap.month; } else newData[item.key] = ""; });
                     
                     const formatFullDate = (d) => { const yHeb = typeof gematriya === 'function' ? gematriya(d.getFullYear()) : d.getFullYear(); const dHeb = typeof gematriya === 'function' ? gematriya(d.getDate()) : d.getDate(); const mName = d.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; return `${dHeb} ${mHeb} ${yHeb}`; };
                     
-                    // 4. Fill Meta/Start/End (Centered, 10px)
+                    // 4. Fill Meta/Start/End (Centered, 11px)
                     findCells(/\{\{start\}\}/i).forEach(c => { newData[c.key] = formatFullDate(startDate); newStyles[c.key] = stylesMap.meta; });
                     findCells(/\{\{end\}\}/i).forEach(c => { newData[c.key] = formatFullDate(endDate); newStyles[c.key] = stylesMap.meta; });
 
@@ -648,18 +706,7 @@
                     <div className="loader-container">
                         <Icon name="FileX" size={64} className="text-slate-300 mb-4" />
                         <h2 className="text-2xl font-bold mb-2">לא נמצאה תבנית</h2>
-                        <div className="flex gap-4">
-                            <label className="btn btn-primary cursor-pointer px-6 py-3">
-                                <Icon name="Upload" />
-                                טען תבנית
-                                <input type="file" accept=".json" onChange={handleManualUpload} className="hidden" />
-                            </label>
-                            <label className="btn btn-secondary cursor-pointer px-6 py-3">
-                                <Icon name="FileUp" />
-                                צור חדש מ-PDF
-                                <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="hidden" />
-                            </label>
-                        </div>
+                        <p className="text-slate-500 text-lg">קובץ תבנית הנתונים 'info.json' לא נמצא.</p>
                     </div>
                 );
             }
@@ -674,7 +721,7 @@
                             <div className="space-y-6">
                                 <div className="input-wrapper">
                                     <label className="input-label">תאריך סיום (יעד)</label>
-                                    <div className="flex gap-3">
+                                    <div className="flex gap-3 flex-col sm:flex-row">
                                         <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
                                         <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">{availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}</select>
                                         <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">{years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}</select>
@@ -725,7 +772,7 @@
                         )}
 
                         {pages.map((page, index) => (
-                            <div key={page.id} className="page-wrapper">
+                            <div key={page.id} className="page-wrapper" style={{ transform: `scale(${previewScale})`, transformOrigin: 'top center', marginBottom: `calc(${297 * previewScale}mm - 297mm + 20px)` }}>
                                 <div className="page-container" onMouseDown={(e) => handleMouseDown(e, page.id)} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
                                     <img src={page.image} className="pdf-bg-img" alt={`Page ${index+1}`} />
                                     
