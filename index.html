@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מחולל לוחות לימוד</title>
+    <title>מחולל לוחות לימוד מתקדם</title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -149,10 +149,10 @@
         background: #f8fafc;
       }
 
-      /* --- EDITOR / WORKSPACE STYLES (Preserved) --- */
+      /* --- EDITOR / WORKSPACE STYLES --- */
       .toolbar {
         background: white;
-        padding: 0.75rem 1.5rem;
+        padding: 0.5rem 1rem;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         position: sticky;
         top: 0;
@@ -162,6 +162,7 @@
         align-items: center;
         border-bottom: 1px solid #cbd5e1;
         height: 70px;
+        transition: all 0.3s ease;
       }
 
       .workspace {
@@ -172,7 +173,7 @@
         gap: 2rem;
         min-height: calc(100vh - 70px);
         overflow: auto;
-        /* Special background for the result view to make pages pop */
+        /* Default bg for workspace */
         background-color: #52525b; 
       }
 
@@ -184,7 +185,7 @@
       }
 
       .page-label {
-        color: #e2e8f0; /* Lighter text on dark background */
+        color: #e2e8f0;
         font-weight: bold;
         font-size: 0.875rem;
         text-align: center;
@@ -230,16 +231,25 @@
         background: rgba(59, 130, 246, 0.1);
         pointer-events: auto; 
       }
-      .grid-container:hover .delete-btn { opacity: 1; }
+      .grid-container:hover .action-btn-group { opacity: 1; }
 
-      .delete-btn {
-        position: absolute; top: -12px; right: -12px;
-        background: red; color: white;
-        border-radius: 50%; width: 24px; height: 24px;
-        display: flex; align-items: center; justify-content: center;
-        cursor: pointer; opacity: 0; transition: opacity 0.2s;
-        z-index: 50; font-size: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      .action-btn-group {
+        position: absolute; top: -28px; right: 0;
+        display: flex; gap: 4px;
+        opacity: 0; transition: opacity 0.2s;
+        z-index: 50;
       }
+
+      .mini-btn {
+        width: 24px; height: 24px;
+        border-radius: 4px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; color: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+      .bg-red { background: #ef4444; }
+      .bg-blue { background: #3b82f6; }
+      .bg-purple { background: #8b5cf6; }
 
       .delete-page-btn {
         position: absolute; top: 0; left: -40px;
@@ -293,16 +303,32 @@
         animation: slideUp 0.5s ease-out;
       }
 
-      .btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 999px; font-weight: 600; transition: all 0.2s; cursor: pointer; font-size: 0.95rem; border: none; }
+      .popover {
+        position: absolute;
+        background: white;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+        z-index: 200;
+        border: 1px solid #e2e8f0;
+        width: 220px;
+        direction: rtl;
+      }
+
+      .btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 999px; font-weight: 600; transition: all 0.2s; cursor: pointer; font-size: 0.9rem; border: none; }
+      .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.8rem; }
       .btn-primary { background: var(--dark-blue); color: white; }
       .btn-primary:hover { background: #334155; }
       .btn-secondary { background: #f1f5f9; color: #475569; }
       .btn-secondary:hover { background: #e2e8f0; }
+      .btn-outline { background: white; border: 1px solid #cbd5e1; color: #334155; }
+      .btn-outline:hover { background: #f1f5f9; }
+      .btn-danger { background: #ef4444; color: white; }
 
       @media print {
         @page { margin: 0; size: A4 portrait; }
         body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .hero-overlay, .floating-toolbar, .delete-btn, .delete-page-btn, .selection-box, .no-print, .page-label, .selection-overlay, .fill-handle, .fill-target-overlay { display: none !important; }
+        .hero-overlay, .floating-toolbar, .toolbar, .action-btn-group, .delete-page-btn, .selection-box, .no-print, .page-label, .selection-overlay, .fill-handle, .fill-target-overlay, .popover { display: none !important; }
         .workspace { display: block; padding: 0; margin: 0; gap: 0; background: white; }
         .page-wrapper { margin: 0; padding: 0; page-break-after: always; break-after: page; }
         .page-container { box-shadow: none; margin: 0; width: 210mm; height: 297mm; transform: none !important; border: none; overflow: hidden; }
@@ -319,6 +345,10 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
         const { HDate, gematriya } = window.hebcal;
+        
+        // --- 1. הדבק את התוכן של ה-JSON כאן במקום null ---
+        // דוגמה: const EMBEDDED_TEMPLATE = { version: 2, pages: [...] };
+        const EMBEDDED_TEMPLATE = null; 
         
         const uid = () => Math.random().toString(36).substr(2, 9);
 
@@ -340,16 +370,12 @@
         const App = () => {
             const [pages, setPages] = useState([]);
             
-            // --- UI STATES ---
-            // 'initial-loading': trying to load info.json
-            // 'wizard': showing input form
-            // 'result': showing the PDF with data
-            const [viewState, setViewState] = useState('initial-loading');
+            // --- APP MODES: 'wizard' | 'preview' | 'editor' ---
+            const [appMode, setAppMode] = useState('initial-loading');
             
             const [isProcessing, setIsProcessing] = useState(false);
             const [processingMsg, setProcessingMsg] = useState("");
             
-            const [mode, setMode] = useState('view'); 
             const [data, setData] = useState({});
             const [cellStyles, setCellStyles] = useState({});
 
@@ -378,15 +404,22 @@
             // --- AUTO LOAD LOGIC ---
             useEffect(() => {
                 const tryLoadTemplate = async () => {
+                    if (EMBEDDED_TEMPLATE) {
+                        try {
+                            const json = typeof EMBEDDED_TEMPLATE === 'string' ? JSON.parse(EMBEDDED_TEMPLATE) : EMBEDDED_TEMPLATE;
+                            loadJson(json);
+                            setAppMode('wizard');
+                            return; 
+                        } catch(e) {}
+                    }
                     try {
                         const response = await fetch('info.json');
                         if (!response.ok) throw new Error("Template not found");
                         const json = await response.json();
                         loadJson(json);
-                        setViewState('wizard');
+                        setAppMode('wizard');
                     } catch (err) {
-                        console.log("Auto-load failed or local mode:", err);
-                        setViewState('no-template');
+                        setAppMode('no-template');
                     }
                 };
                 tryLoadTemplate();
@@ -403,9 +436,6 @@
                     setData({}); 
                     setCellStyles({});
                 } 
-                else {
-                    alert("פורמט לא נתמך");
-                }
             };
 
             const handleManualUpload = (e) => {
@@ -416,383 +446,296 @@
                     try {
                         const json = JSON.parse(ev.target.result);
                         loadJson(json);
-                        setViewState('wizard');
+                        setAppMode('wizard');
                     } catch(err) { alert("קובץ לא תקין"); }
                 };
                 reader.readAsText(file);
             };
 
-            // --- DATE LOGIC HELPERS ---
-            const isLeap = useMemo(() => {
-                try { return HDate.isLeapYear(parseInt(selectedYear)); } catch(e) { return false; }
-            }, [selectedYear]);
-
-            const availableMonths = useMemo(() => {
-                return [ "Tishrei", "Cheshvan", "Kislev", "Tevet", "Sh'vat", ...(isLeap ? ["Adar I", "Adar II"] : ["Adar"]), "Nisan", "Iyar", "Sivan", "Tamuz", "Av", "Elul" ];
-            }, [isLeap]);
-            
-            useEffect(() => {
-                if (!availableMonths.includes(selectedMonth)) {
-                    if (selectedMonth.includes("Adar")) setSelectedMonth(isLeap ? "Adar II" : "Adar"); 
-                    else setSelectedMonth(availableMonths[0]);
-                }
-            }, [selectedYear, isLeap]);
-
+            // --- WIZARD LOGIC (DATE HELPERS) ---
+            const isLeap = useMemo(() => { try { return HDate.isLeapYear(parseInt(selectedYear)); } catch(e) { return false; } }, [selectedYear]);
+            const availableMonths = useMemo(() => { return [ "Tishrei", "Cheshvan", "Kislev", "Tevet", "Sh'vat", ...(isLeap ? ["Adar I", "Adar II"] : ["Adar"]), "Nisan", "Iyar", "Sivan", "Tamuz", "Av", "Elul" ]; }, [isLeap]);
+            useEffect(() => { if (!availableMonths.includes(selectedMonth)) { if (selectedMonth.includes("Adar")) setSelectedMonth(isLeap ? "Adar II" : "Adar"); else setSelectedMonth(availableMonths[0]); } }, [selectedYear, isLeap]);
             const years = Array.from({length: 20}, (_, i) => today.getFullYear() - 5 + i);
             const formatHNum = (n) => { const map = {1:'א',2:'ב',3:'ג',4:'ד',5:'ה',6:'ו',7:'ז',8:'ח',9:'ט',10:'י',11:'יא',12:'יב',13:'יג',14:'יד',15:'טו',16:'טז',17:'יז',18:'יח',19:'יט',20:'כ',21:'כא',22:'כב',23:'כג',24:'כד',25:'כה',26:'כו',27:'כז',28:'כח',29:'כט',30:'ל'}; return map[n] || n; };
             const monthHebrewDisplay = { "Nisan": "ניסן", "Iyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול", "Tishrei": "תשרי", "Cheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", "Sh'vat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'" };
             const getYearStr = (y) => { if (typeof gematriya === 'function') return gematriya(y); try { return new HDate(1, "Tishrei", y).render('he').split(' ').pop().replace('הת',''); } catch(e) { return y; } };
 
-
-            // --- CORE GENERATOR LOGIC (EXACTLY AS PROVIDED IN THE ORIGINAL CODE) ---
             const handleWizardSubmit = () => {
                  try {
                     const endDate = new HDate(parseInt(selectedDay), selectedMonth, parseInt(selectedYear));
                     const newData = { ...data };
                     const newStyles = { ...cellStyles };
                     
-                    const stylesMap = {
-                        name: { fontSize: '13px', fontWeight: '800', textAlign: 'center' },
-                        month: { fontSize: '10px', fontWeight: '700', textAlign: 'center' },
-                        meta: { fontSize: '10px', fontWeight: '700', textAlign: 'center' }
+                    // UPDATED STYLES CONFIGURATION
+                    const stylesMap = { 
+                        name: { fontSize: '13px', fontWeight: '800', textAlign: 'center' }, 
+                        month: { fontSize: '10px', fontWeight: '700', textAlign: 'right' }, 
+                        meta: { fontSize: '10px', fontWeight: '700', textAlign: 'center' },
+                        date: { fontSize: '7.5px', fontWeight: '700', textAlign: 'right' }
                     };
-
-                    const monthHebrewNames = {
-                        "Nisan": "ניסן", "Iyar": "אייר", "Iyyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול",
-                        "Tishrei": "תשרי", "Cheshvan": "חשוון", "MarCheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", 
-                        "Sh'vat": "שבט", "Shvat": "שבט", "Shevat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'"
-                    };
-
-                    // 1. Fill Name
-                    const findCells = (pattern) => {
-                        const matches = [];
-                        Object.entries(newData).forEach(([key, val]) => {
-                            if (String(val).match(pattern)) matches.push({ key, val });
-                        });
-                        return matches;
-                    };
-
-                    const nameCells = findCells(/\{\{Name of the deceased\}\}/i);
-                    nameCells.forEach(item => {
-                        newData[item.key] = deceasedName;
-                        newStyles[item.key] = stylesMap.name;
-                    });
-
-                    // 2. Identify Dates Logic
-                    let dateCells = [];
-                    const monthCells = []; 
-                    const cellMeta = {};
                     
-                    pages.forEach((p, pIdx) => {
-                        p.tables.forEach(t => {
-                            for(let r=0; r<t.rows; r++) {
-                                for(let c=0; c<t.cols; c++) {
-                                    const key = `${t.id}_${r}_${c}`;
-                                    const val = newData[key];
-                                    cellMeta[key] = { pIdx, tY: t.y, r, c };
-                                    
-                                    if (val) {
-                                        const dateMatch = String(val).match(/\{\{date(\d+)\}\}/i);
-                                        if (dateMatch) dateCells.push({ key, group: parseInt(dateMatch[1]), ...cellMeta[key] });
-                                        
-                                        const monthMatch = String(val).match(/\{\{month(\d+)\}\}/i);
-                                        if (monthMatch) monthCells.push({ key, group: parseInt(monthMatch[1]) });
-                                    }
-                                }
-                            }
-                        });
-                    });
+                    const monthHebrewNames = { "Nisan": "ניסן", "Iyar": "אייר", "Iyyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול", "Tishrei": "תשרי", "Cheshvan": "חשוון", "MarCheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", "Sh'vat": "שבט", "Shvat": "שבט", "Shevat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'" };
 
-                    // --- AUTO-FILL FALLBACK LOGIC ---
+                    const findCells = (pattern) => { const matches = []; Object.entries(newData).forEach(([key, val]) => { if (String(val).match(pattern)) matches.push({ key, val }); }); return matches; };
+                    
+                    // 1. Fill Name (Centered, 13px)
+                    findCells(/\{\{Name of the deceased\}\}/i).forEach(item => { newData[item.key] = deceasedName; newStyles[item.key] = stylesMap.name; });
+
+                    let dateCells = []; const monthCells = []; const cellMeta = {};
+                    pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; const val = newData[key]; cellMeta[key] = { pIdx, tY: t.y, r, c }; if (val) { const dateMatch = String(val).match(/\{\{date(\d+)\}\}/i); if (dateMatch) dateCells.push({ key, group: parseInt(dateMatch[1]), ...cellMeta[key] }); const monthMatch = String(val).match(/\{\{month(\d+)\}\}/i); if (monthMatch) monthCells.push({ key, group: parseInt(monthMatch[1]) }); } } } }); });
+
                     if (dateCells.length === 0) {
-                        // In Wizard mode, we skip the "confirm" dialog and just do it if tags are missing
-                        // This fixes the issue where templates without tags showed up empty
                         const allPotentialCells = [];
-                        pages.forEach((p, pIdx) => {
-                            p.tables.forEach(t => {
-                                for(let r=0; r<t.rows; r++) {
-                                    for(let c=0; c<t.cols; c++) {
-                                        const key = `${t.id}_${r}_${c}`;
-                                        // Simple check to ensure we don't overwrite name placeholders if they exist but were missed
-                                        if (!String(newData[key] || "").match(/\{\{Name|\{\{month/i)) {
-                                            allPotentialCells.push({ key, pIdx, tY: t.y, r, c });
-                                        }
-                                    }
-                                }
-                            });
-                        });
-
-                        // Sort spatially: Page -> Table Y -> Row -> Col DESC (RTL)
-                        allPotentialCells.sort((a, b) => {
-                            if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx;
-                            if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY;
-                            if (a.r !== b.r) return a.r - b.r;
-                            return b.c - a.c;
-                        });
-
+                        pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; if (!String(newData[key] || "").match(/\{\{Name|\{\{month/i)) allPotentialCells.push({ key, pIdx, tY: t.y, r, c }); } } }); });
+                        allPotentialCells.sort((a, b) => { if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx; if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY; if (a.r !== b.r) return a.r - b.r; return b.c - a.c; });
                         dateCells = allPotentialCells.map((c, idx) => ({ ...c, group: idx + 1 }));
                     } else {
-                        dateCells.sort((a, b) => {
-                            if (a.group !== b.group) return a.group - b.group;
-                            if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx;
-                            if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY;
-                            if (a.r !== b.r) return a.r - b.r;
-                            return b.c - a.c; 
-                        });
+                        dateCells.sort((a, b) => { if (a.group !== b.group) return a.group - b.group; if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx; if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY; if (a.r !== b.r) return a.r - b.r; return b.c - a.c; });
                     }
 
-                    const totalDays = dateCells.length;
-                    if (totalDays === 0) {
-                        alert("לא נמצאו טבלאות למילוי בתבנית.");
-                        return;
-                    }
-
-                    // Reverse Calculation
-                    let runningDate = endDate; 
-                    let startDate = null;
-                    const groupMonths = {}; 
+                    if (dateCells.length === 0) { alert("לא נמצאו טבלאות למילוי."); return; }
+                    let runningDate = endDate; let startDate = null; const groupMonths = {}; 
 
                     for (let i = dateCells.length - 1; i >= 0; i--) {
-                        const cell = dateCells[i];
-                        const dHeb = typeof gematriya === 'function' ? gematriya(runningDate.getDate()) : runningDate.getDate(); 
-                        const mName = runningDate.getMonthName();
-                        const mHeb = monthHebrewNames[mName] || mName;
-                        const formatted = `${dHeb} ${mHeb}`;
+                        const cell = dateCells[i]; const dHeb = typeof gematriya === 'function' ? gematriya(runningDate.getDate()) : runningDate.getDate(); 
+                        const mName = runningDate.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; const formatted = `${dHeb} ${mHeb}`;
                         
-                        newData[cell.key] = formatted;
+                        // 2. Fill Dates (Right align, 10px, space prefix)
+                        newData[cell.key] = " " + formatted;
+                        newStyles[cell.key] = stylesMap.date;
 
-                        if (!groupMonths[cell.group]) groupMonths[cell.group] = new Set();
-                        groupMonths[cell.group].add(mHeb);
-
+                        if (!groupMonths[cell.group]) groupMonths[cell.group] = new Set(); groupMonths[cell.group].add(mHeb);
                         if (i === 0) startDate = runningDate;
                         runningDate = runningDate.prev();
                     }
 
-                    // Fill Months
-                    monthCells.forEach(item => {
-                        const months = groupMonths[item.group];
-                        if (months && months.size > 0) {
-                            const mArray = Array.from(months).reverse();
-                            newData[item.key] = mArray.join(' - ');
-                            newStyles[item.key] = stylesMap.month;
-                        } else newData[item.key] = "";
-                    });
+                    // 3. Fill Months (Right align, 10px)
+                    monthCells.forEach(item => { const months = groupMonths[item.group]; if (months && months.size > 0) { newData[item.key] = Array.from(months).reverse().join(' - '); newStyles[item.key] = stylesMap.month; } else newData[item.key] = ""; });
+                    
+                    const formatFullDate = (d) => { const yHeb = typeof gematriya === 'function' ? gematriya(d.getFullYear()) : d.getFullYear(); const dHeb = typeof gematriya === 'function' ? gematriya(d.getDate()) : d.getDate(); const mName = d.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; return `${dHeb} ${mHeb} ${yHeb}`; };
+                    
+                    // 4. Fill Meta/Start/End (Centered, 10px)
+                    findCells(/\{\{start\}\}/i).forEach(c => { newData[c.key] = formatFullDate(startDate); newStyles[c.key] = stylesMap.meta; });
+                    findCells(/\{\{end\}\}/i).forEach(c => { newData[c.key] = formatFullDate(endDate); newStyles[c.key] = stylesMap.meta; });
 
-                    // Fill Meta
-                    const formatFullDate = (d) => {
-                        const yHeb = typeof gematriya === 'function' ? gematriya(d.getFullYear()) : d.getFullYear();
-                        const dHeb = typeof gematriya === 'function' ? gematriya(d.getDate()) : d.getDate();
-                        const mName = d.getMonthName();
-                        const mHeb = monthHebrewNames[mName] || mName;
-                        return `${dHeb} ${mHeb} ${yHeb}`;
-                    };
-
-                    const startStr = formatFullDate(startDate);
-                    const endStr = formatFullDate(endDate);
-
-                    findCells(/\{\{start\}\}/i).forEach(c => { newData[c.key] = startStr; newStyles[c.key] = stylesMap.meta; });
-                    findCells(/\{\{end\}\}/i).forEach(c => { newData[c.key] = endStr; newStyles[c.key] = stylesMap.meta; });
-
-                    setData(newData);
-                    setCellStyles(newStyles);
-                    setViewState('result'); // Switch to result view
-                } catch (e) {
-                    console.error("Generator Error:", e);
-                    alert(`שגיאה ביצירת הלוח:\n${e.message}`);
-                }
+                    setData(newData); setCellStyles(newStyles);
+                    setAppMode('preview'); // Go to clean preview mode
+                } catch (e) { console.error(e); alert("שגיאה ביצירת הלוח"); }
             };
 
-            // --- ALL HELPER FUNCTIONS (Preserved exactly as requested) ---
+            // --- FEATURE: REPLACE BACKGROUND ---
+            const handleBackgroundReplace = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                setIsProcessing(true); setProcessingMsg("מחליף רקעים...");
+                try {
+                    const buf = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(buf).promise;
+                    const newImages = [];
+                    const count = Math.min(pdf.numPages, pages.length); // Limit to existing page count
+                    
+                    for (let i = 1; i <= count; i++) {
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 2.0 });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width;
+                        canvas.height = viewport.height;
+                        const ctx = canvas.getContext('2d');
+                        await page.render({ canvasContext: ctx, viewport }).promise;
+                        newImages.push(canvas.toDataURL('image/jpeg', 0.8));
+                    }
+                    
+                    setPages(prev => prev.map((p, idx) => {
+                         // If we have a new image for this index, replace it. Keep tables intact.
+                         return newImages[idx] ? { ...p, image: newImages[idx] } : p;
+                    }));
+                    alert("הרקעים הוחלפו בהצלחה! הנתונים והטבלאות נשמרו.");
+                } catch(err) { alert("שגיאה בטעינת ה-PDF"); } finally { setIsProcessing(false); }
+            };
+
+            // --- FEATURE: AUTO-ALIGN TABLE (Refine) ---
+            const refineTablePosition = (pageIndex, tableId) => {
+                const page = pages[pageIndex];
+                const table = page.tables.find(t => t.id === tableId);
+                if (!table) return;
+
+                // Create a canvas for the existing image
+                const img = new Image();
+                img.src = page.image;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width; canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // Add some margin to search around the current table
+                    const margin = 20; 
+                    const domWidth = 793.7; const domHeight = 1122.5; 
+                    const scaleX = canvas.width / domWidth; 
+                    const scaleY = canvas.height / domHeight;
+
+                    const searchX = Math.max(0, (table.x - margin) * scaleX);
+                    const searchY = Math.max(0, (table.y - margin) * scaleY);
+                    const searchW = Math.min(canvas.width - searchX, (table.w + margin * 2) * scaleX);
+                    const searchH = Math.min(canvas.height - searchY, (table.h + margin * 2) * scaleY);
+
+                    // Crop and detect in this small area
+                    const searchCanvas = document.createElement('canvas');
+                    searchCanvas.width = searchW; searchCanvas.height = searchH;
+                    searchCanvas.getContext('2d').drawImage(canvas, searchX, searchY, searchW, searchH, 0, 0, searchW, searchH);
+                    
+                    const detected = detectTablesInCanvas(searchCanvas);
+                    if (detected.length > 0) {
+                        // Find the one that matches best (biggest overlap) or just take the biggest result
+                        // Since we cropped around the table, the detected coordinate is relative to the crop
+                        const result = detected[0]; // Assume the biggest/first one found in crop is the right one
+                        
+                        // Convert back to page coordinates
+                        const newX = (searchX + result.x / scaleX * scaleX) / scaleX; // De-scale inside result, re-scale to page
+                        const newY = (searchY + result.y / scaleY * scaleY) / scaleY;
+                        
+                        // We need to trust the detected size, but maybe keep row/cols count?
+                        // Let's update x, y, w, h
+                        setPages(prev => prev.map((p, idx) => {
+                            if (idx !== pageIndex) return p;
+                            return {
+                                ...p,
+                                tables: p.tables.map(t => t.id === tableId ? { ...t, x: newX, y: newY, w: result.w, h: result.h } : t)
+                            };
+                        }));
+                    } else {
+                        alert("לא זוהו קווים ברורים באזור זה לתיקון המיקום.");
+                    }
+                };
+            };
+
+
+            // --- HELPER FUNCTIONS ---
             const handleKeyDown = (e, tableId, row, col, maxRows, maxCols) => {
                 let nextRow = row; let nextCol = col; let handled = false;
-                switch(e.key) {
-                    case 'ArrowUp': nextRow = row - 1; handled = true; break;
-                    case 'ArrowDown': nextRow = row + 1; handled = true; break;
-                    case 'ArrowLeft': nextCol = col + 1; handled = true; break;
-                    case 'ArrowRight': nextCol = col - 1; handled = true; break;
-                }
-                if (handled) {
-                    if (nextRow >= 0 && nextRow < maxRows && nextCol >= 0 && nextCol < maxCols) {
-                        e.preventDefault();
-                        const nextId = `${tableId}_${nextRow}_${nextCol}`;
-                        const el = document.getElementById(nextId);
-                        if (el) { el.focus(); setCellSelection({ tableId, startR: nextRow, startC: nextCol, endR: nextRow, endC: nextCol }); }
-                    }
-                }
+                switch(e.key) { case 'ArrowUp': nextRow = row - 1; handled = true; break; case 'ArrowDown': nextRow = row + 1; handled = true; break; case 'ArrowLeft': nextCol = col + 1; handled = true; break; case 'ArrowRight': nextCol = col - 1; handled = true; break; }
+                if (handled && nextRow >= 0 && nextRow < maxRows && nextCol >= 0 && nextCol < maxCols) { e.preventDefault(); const nextId = `${tableId}_${nextRow}_${nextCol}`; const el = document.getElementById(nextId); if (el) { el.focus(); setCellSelection({ tableId, startR: nextRow, startC: nextCol, endR: nextRow, endC: nextCol }); } }
             };
-            const handleCellMouseDown = (e, tableId, r, c) => {
-                if (mode === 'edit') return;
-                if (e.shiftKey && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); } 
-                else { setCellSelection({ tableId, startR: r, startC: c, endR: r, endC: c }); setIsSelectingCells(true); }
-            };
-            const handleCellMouseEnter = (e, tableId, r, c) => {
-                if (isFilling && cellSelection && cellSelection.tableId === tableId) { setFillTarget({ endR: r, endC: c }); } 
-                else if (isSelectingCells && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); }
-            };
+            const handleCellMouseDown = (e, tableId, r, c) => { if (appMode !== 'editor') return; if (e.shiftKey && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); } else { setCellSelection({ tableId, startR: r, startC: c, endR: r, endC: c }); setIsSelectingCells(true); } };
+            const handleCellMouseEnter = (e, tableId, r, c) => { if (isFilling && cellSelection && cellSelection.tableId === tableId) { setFillTarget({ endR: r, endC: c }); } else if (isSelectingCells && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); } };
             const handleFillHandleMouseDown = (e) => { e.stopPropagation(); e.preventDefault(); setIsFilling(true); setFillTarget({ endR: cellSelection.endR, endC: cellSelection.endC }); };
-            useEffect(() => {
-                const handleGlobalMouseUp = () => {
-                    if (isSelectingCells) setIsSelectingCells(false);
-                    if (isFilling) { applyFill(); setIsFilling(false); setFillTarget(null); }
-                };
-                window.addEventListener('mouseup', handleGlobalMouseUp); return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-            }, [isSelectingCells, isFilling, fillTarget, cellSelection, data]);
-            const applyFill = () => {
-                if (!fillTarget || !cellSelection) return;
-                const { tableId, startR, startC, endR: selEndR, endC: selEndC } = cellSelection;
-                const { endR: targetR, endC: targetC } = fillTarget;
-                const r1 = Math.min(startR, selEndR); const r2 = Math.max(startR, selEndR);
-                const c1 = Math.min(startC, selEndC); const c2 = Math.max(startC, selEndC);
-                const tr1 = Math.min(r1, targetR); const tr2 = Math.max(r2, targetR);
-                if (tr2 <= r2 && tr1 >= r1) return; 
-                const newData = { ...data };
-                for (let c = c1; c <= c2; c++) {
-                    const sourceValues = [];
-                    for(let r = r1; r <= r2; r++) sourceValues.push(data[`${tableId}_${r}_${c}`] || "");
-                    if (targetR > r2) {
-                        const count = targetR - r2;
-                        const nextVals = generateNextValues(sourceValues, count);
-                        nextVals.forEach((val, i) => { const row = r2 + 1 + i; newData[`${tableId}_${row}_${c}`] = val; });
-                    }
-                }
-                setData(newData); setCellSelection(prev => ({ ...prev, endR: Math.max(prev.endR, targetR), endC: Math.max(prev.endC, targetC) }));
-            };
-            const generateNextValues = (sequence, count) => {
-                const result = []; if (sequence.length === 0) return Array(count).fill("");
-                const isNumeric = (str) => !isNaN(parseFloat(str)) && isFinite(str); const parseNum = (str) => parseFloat(str);
-                if (sequence.every(isNumeric) && sequence.length > 1) {
-                    const nums = sequence.map(parseNum); const diff = nums[nums.length - 1] - nums[nums.length - 2];
-                    let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; last = Math.round(last * 100) / 100; result.push(String(last)); }
-                    return result;
-                }
-                const regex = /^(.*?)(\d+)$/; const matches = sequence.map(s => String(s).match(regex));
-                if (sequence.length > 1 && matches.every(m => m)) {
-                    const prefix = matches[0][1];
-                    if (matches.every(m => m[1] === prefix)) {
-                        const nums = matches.map(m => parseInt(m[2])); const diff = nums[nums.length - 1] - nums[nums.length - 2];
-                        let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; result.push(`${prefix}${last}`); }
-                        return result;
-                    }
-                }
-                for(let i=0; i<count; i++) result.push(sequence[i % sequence.length]); return result;
-            };
-
-            // Keep all the PDF handling and Table Detection for "Edit" mode if user needs it later
-            const detectTablesInCanvas = (canvas) => {
-                 const width = canvas.width; const height = canvas.height; const ctx = canvas.getContext('2d');
-                const imgData = ctx.getImageData(0, 0, width, height); const data32 = new Uint32Array(imgData.data.buffer);
-                const isDark = (val) => (val & 0xFF) < 180 && ((val >> 8) & 0xFF) < 180 && ((val >> 16) & 0xFF) < 180;
-                const MIN_H_LEN = width * 0.04; const MIN_V_LEN = height * 0.03;
-                let hLines = [], vLines = [];
-                for (let y = 0; y < height; y += 3) { let startX = -1; for (let x = 0; x < width; x++) { if (isDark(data32[y * width + x])) { if (startX === -1) startX = x; } else { if (startX !== -1) { if ((x - startX) > MIN_H_LEN) hLines.push({ y, x1: startX, x2: x }); startX = -1; } } } }
-                for (let x = 0; x < width; x += 3) { let startY = -1; for (let y = 0; y < height; y++) { if (isDark(data32[y * width + x])) { if (startY === -1) startY = y; } else { if (startY !== -1) { if ((y - startY) > MIN_V_LEN) vLines.push({ x, y1: startY, y2: y }); startY = -1; } } } }
-                 const mergeLines = (lines, isVertical) => { if (lines.length === 0) return []; lines.sort((a, b) => isVertical ? (a.x - b.x) : (a.y - b.y)); const merged = []; let curr = lines[0]; for (let i = 1; i < lines.length; i++) { const next = lines[i]; const diff = isVertical ? (next.x - curr.x) : (next.y - curr.y); const overlapStart = Math.max(isVertical ? curr.y1 : curr.x1, isVertical ? next.y1 : next.x1); const overlapEnd = Math.min(isVertical ? curr.y2 : curr.x2, isVertical ? next.y2 : next.x2); if (diff < 5 && (overlapEnd - overlapStart) > 0) { if (isVertical) { curr.y1 = Math.min(curr.y1, next.y1); curr.y2 = Math.max(curr.y2, next.y2); } else { curr.x1 = Math.min(curr.x1, next.x1); curr.x2 = Math.max(curr.x2, next.x2); } curr.thickness = (curr.thickness || 1) + diff; } else { if ((curr.thickness || 1) < 20) merged.push(curr); curr = next; } } if ((curr.thickness || 1) < 20) merged.push(curr); return merged; };
-                const cleanH = mergeLines(hLines, false); const cleanV = mergeLines(vLines, true); if (cleanH.length < 2 || cleanV.length < 2) return [];
-                const V_OFFSET = cleanH.length; const adj = new Array(cleanH.length + cleanV.length).fill(null).map(() => []);
-                cleanH.forEach((h, hIdx) => { cleanV.forEach((v, vIdx) => { if (v.x >= h.x1 - 5 && v.x <= h.x2 + 5 && h.y >= v.y1 - 5 && h.y <= v.y2 + 5) { adj[hIdx].push(V_OFFSET + vIdx); adj[V_OFFSET + vIdx].push(hIdx); } }); });
-                const visited = new Array(adj.length).fill(false); const foundTables = [];
-                for (let i = 0; i < adj.length; i++) { if (!visited[i] && adj[i].length > 0) { const componentH = []; const componentV = []; const queue = [i]; visited[i] = true; while (queue.length > 0) { const node = queue.pop(); if (node < V_OFFSET) componentH.push(cleanH[node]); else componentV.push(cleanV[node - V_OFFSET]); for (const neighbor of adj[node]) { if (!visited[neighbor]) { visited[neighbor] = true; queue.push(neighbor); } } } if (componentH.length >= 2 && componentV.length >= 2) { foundTables.push({ h: componentH, v: componentV }); } } }
-                const domWidth = 793.7; const domHeight = 1122.5; const scaleX = domWidth / width; const scaleY = domHeight / height;
-                return foundTables.map(tbl => { const minX = Math.min(...tbl.v.map(l => l.x)); const maxX = Math.max(...tbl.v.map(l => l.x)); const minY = Math.min(...tbl.h.map(l => l.y)); const maxY = Math.max(...tbl.h.map(l => l.y)); const uniqueY = tbl.h.map(l => l.y).sort((a,b)=>a-b).filter((y, i, arr) => i===0 || y - arr[i-1] > 10); const uniqueX = tbl.v.map(l => l.x).sort((a,b)=>a-b).filter((x, i, arr) => i===0 || x - arr[i-1] > 10); let rows = Math.max(1, uniqueY.length - 1); let cols = Math.max(1, uniqueX.length - 1); if (rows === 0) rows = uniqueY.length; if (cols === 0) cols = uniqueX.length; return { id: uid(), x: minX * scaleX, y: minY * scaleY, w: (maxX - minX) * scaleX, h: (maxY - minY) * scaleY, rows: rows, cols: cols }; });
-            };
-
+            useEffect(() => { const handleGlobalMouseUp = () => { if (isSelectingCells) setIsSelectingCells(false); if (isFilling) { applyFill(); setIsFilling(false); setFillTarget(null); } }; window.addEventListener('mouseup', handleGlobalMouseUp); return () => window.removeEventListener('mouseup', handleGlobalMouseUp); }, [isSelectingCells, isFilling, fillTarget, cellSelection, data]);
+            const applyFill = () => { if (!fillTarget || !cellSelection) return; const { tableId, startR, startC, endR: selEndR, endC: selEndC } = cellSelection; const { endR: targetR, endC: targetC } = fillTarget; const r1 = Math.min(startR, selEndR); const r2 = Math.max(startR, selEndR); const c1 = Math.min(startC, selEndC); const c2 = Math.max(startC, selEndC); const tr1 = Math.min(r1, targetR); const tr2 = Math.max(r2, targetR); if (tr2 <= r2 && tr1 >= r1) return; const newData = { ...data }; for (let c = c1; c <= c2; c++) { const sourceValues = []; for(let r = r1; r <= r2; r++) sourceValues.push(data[`${tableId}_${r}_${c}`] || ""); if (targetR > r2) { const count = targetR - r2; const nextVals = generateNextValues(sourceValues, count); nextVals.forEach((val, i) => { const row = r2 + 1 + i; newData[`${tableId}_${row}_${c}`] = val; }); } } setData(newData); setCellSelection(prev => ({ ...prev, endR: Math.max(prev.endR, targetR), endC: Math.max(prev.endC, targetC) })); };
+            const generateNextValues = (sequence, count) => { const result = []; if (sequence.length === 0) return Array(count).fill(""); const isNumeric = (str) => !isNaN(parseFloat(str)) && isFinite(str); const parseNum = (str) => parseFloat(str); if (sequence.every(isNumeric) && sequence.length > 1) { const nums = sequence.map(parseNum); const diff = nums[nums.length - 1] - nums[nums.length - 2]; let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; last = Math.round(last * 100) / 100; result.push(String(last)); } return result; } const regex = /^(.*?)(\d+)$/; const matches = sequence.map(s => String(s).match(regex)); if (sequence.length > 1 && matches.every(m => m)) { const prefix = matches[0][1]; if (matches.every(m => m[1] === prefix)) { const nums = matches.map(m => parseInt(m[2])); const diff = nums[nums.length - 1] - nums[nums.length - 2]; let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; result.push(`${prefix}${last}`); } return result; } } for(let i=0; i<count; i++) result.push(sequence[i % sequence.length]); return result; };
+            const detectTablesInCanvas = (canvas) => { const width = canvas.width; const height = canvas.height; const ctx = canvas.getContext('2d'); const imgData = ctx.getImageData(0, 0, width, height); const data32 = new Uint32Array(imgData.data.buffer); const isDark = (val) => (val & 0xFF) < 180 && ((val >> 8) & 0xFF) < 180 && ((val >> 16) & 0xFF) < 180; const MIN_H_LEN = width * 0.04; const MIN_V_LEN = height * 0.03; let hLines = [], vLines = []; for (let y = 0; y < height; y += 3) { let startX = -1; for (let x = 0; x < width; x++) { if (isDark(data32[y * width + x])) { if (startX === -1) startX = x; } else { if (startX !== -1) { if ((x - startX) > MIN_H_LEN) hLines.push({ y, x1: startX, x2: x }); startX = -1; } } } } for (let x = 0; x < width; x += 3) { let startY = -1; for (let y = 0; y < height; y++) { if (isDark(data32[y * width + x])) { if (startY === -1) startY = y; } else { if (startY !== -1) { if ((y - startY) > MIN_V_LEN) vLines.push({ x, y1: startY, y2: y }); startY = -1; } } } } const mergeLines = (lines, isVertical) => { if (lines.length === 0) return []; lines.sort((a, b) => isVertical ? (a.x - b.x) : (a.y - b.y)); const merged = []; let curr = lines[0]; for (let i = 1; i < lines.length; i++) { const next = lines[i]; const diff = isVertical ? (next.x - curr.x) : (next.y - curr.y); const overlapStart = Math.max(isVertical ? curr.y1 : curr.x1, isVertical ? next.y1 : next.x1); const overlapEnd = Math.min(isVertical ? curr.y2 : curr.x2, isVertical ? next.y2 : next.x2); if (diff < 5 && (overlapEnd - overlapStart) > 0) { if (isVertical) { curr.y1 = Math.min(curr.y1, next.y1); curr.y2 = Math.max(curr.y2, next.y2); } else { curr.x1 = Math.min(curr.x1, next.x1); curr.x2 = Math.max(curr.x2, next.x2); } curr.thickness = (curr.thickness || 1) + diff; } else { if ((curr.thickness || 1) < 20) merged.push(curr); curr = next; } } if ((curr.thickness || 1) < 20) merged.push(curr); return merged; }; const cleanH = mergeLines(hLines, false); const cleanV = mergeLines(vLines, true); if (cleanH.length < 2 || cleanV.length < 2) return []; const V_OFFSET = cleanH.length; const adj = new Array(cleanH.length + cleanV.length).fill(null).map(() => []); cleanH.forEach((h, hIdx) => { cleanV.forEach((v, vIdx) => { if (v.x >= h.x1 - 5 && v.x <= h.x2 + 5 && h.y >= v.y1 - 5 && h.y <= v.y2 + 5) { adj[hIdx].push(V_OFFSET + vIdx); adj[V_OFFSET + vIdx].push(hIdx); } }); }); const visited = new Array(adj.length).fill(false); const foundTables = []; for (let i = 0; i < adj.length; i++) { if (!visited[i] && adj[i].length > 0) { const componentH = []; const componentV = []; const queue = [i]; visited[i] = true; while (queue.length > 0) { const node = queue.pop(); if (node < V_OFFSET) componentH.push(cleanH[node]); else componentV.push(cleanV[node - V_OFFSET]); for (const neighbor of adj[node]) { if (!visited[neighbor]) { visited[neighbor] = true; queue.push(neighbor); } } } if (componentH.length >= 2 && componentV.length >= 2) { foundTables.push({ h: componentH, v: componentV }); } } } const domWidth = 793.7; const domHeight = 1122.5; const scaleX = domWidth / width; const scaleY = domHeight / height; return foundTables.map(tbl => { const minX = Math.min(...tbl.v.map(l => l.x)); const maxX = Math.max(...tbl.v.map(l => l.x)); const minY = Math.min(...tbl.h.map(l => l.y)); const maxY = Math.max(...tbl.h.map(l => l.y)); const uniqueY = tbl.h.map(l => l.y).sort((a,b)=>a-b).filter((y, i, arr) => i===0 || y - arr[i-1] > 10); const uniqueX = tbl.v.map(l => l.x).sort((a,b)=>a-b).filter((x, i, arr) => i===0 || x - arr[i-1] > 10); let rows = Math.max(1, uniqueY.length - 1); let cols = Math.max(1, uniqueX.length - 1); if (rows === 0) rows = uniqueY.length; if (cols === 0) cols = uniqueX.length; return { id: uid(), x: minX * scaleX, y: minY * scaleY, w: (maxX - minX) * scaleX, h: (maxY - minY) * scaleY, rows: rows, cols: cols }; }); };
+            
             const getCoords = (e, pageElem) => { const rect = pageElem.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; };
-            const handleMouseDown = (e, pageId) => { if (mode !== 'edit' || pendingTable) return; const pageElem = e.currentTarget; const { x, y } = getCoords(e, pageElem); activePageRef.current = pageId; setSelection({ startX: x, startY: y, currentX: x, currentY: y }); };
+            const handleMouseDown = (e, pageId) => { if (appMode !== 'editor' || pendingTable) return; const pageElem = e.currentTarget; const { x, y } = getCoords(e, pageElem); activePageRef.current = pageId; setSelection({ startX: x, startY: y, currentX: x, currentY: y }); };
             const handleMouseMove = (e) => { if (!selection) return; const pageElem = e.currentTarget; const { x, y } = getCoords(e, pageElem); setSelection(prev => ({ ...prev, currentX: x, currentY: y })); };
-            const handleMouseUp = () => { if (!selection) return; const x = Math.min(selection.startX, selection.currentX); const y = Math.min(selection.startY, selection.currentY); const w = Math.abs(selection.currentX - selection.startX); const h = Math.abs(selection.currentY - selection.startY); setSelection(null); if (w > 20 && h > 20 && activePageRef.current) setPendingTable({ pageId: activePageRef.current, x, y, w, h }); };
+            const handleMouseUp = () => { if (!selection) return; const x = Math.min(selection.startX, selection.currentX); const y = Math.min(selection.startY, selection.currentY); const w = Math.abs(selection.currentX - selection.startX); const h = Math.abs(selection.currentY - selection.startY); setSelection(null); if (w > 5 && h > 5 && activePageRef.current) setPendingTable({ pageId: activePageRef.current, x, y, w, h }); };
             const confirmTable = () => { if (!pendingTable) return; setPages(prevPages => prevPages.map(p => { if (p.id !== pendingTable.pageId) return p; return { ...p, tables: [...p.tables, { id: uid(), x: pendingTable.x, y: pendingTable.y, w: pendingTable.w, h: pendingTable.h, rows: parseInt(newTableConfig.rows) || 10, cols: parseInt(newTableConfig.cols) || 4 }] }; })); setPendingTable(null); };
             const deleteTable = (pageId, tableId) => { if (confirm("למחוק טבלה זו?")) setPages(prev => prev.map(p => { if (p.id !== pageId) return p; return { ...p, tables: p.tables.filter(t => t.id !== tableId) }; })); };
             const deletePage = (pageId) => { if (confirm("האם למחוק את כל העמוד הזה?")) setPages(prev => prev.filter(p => p.id !== pageId)); };
             const handleInputChange = (tableId, row, col, val) => { const key = `${tableId}_${row}_${col}`; setData(prev => ({ ...prev, [key]: val })); };
+            
+            const saveTemplate = () => { if (pages.length === 0) return; const template = { version: 2, pages: pages, data: data, styles: cellStyles }; const blob = new Blob([JSON.stringify(template)], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "template.json"; a.click(); };
+            const handlePdfUpload = async (e) => { const file = e.target.files[0]; if (!file) return; setIsProcessing(true); setProcessingMsg("טוען עמודים..."); try { const buf = await file.arrayBuffer(); const pdf = await pdfjsLib.getDocument(buf).promise; const newPages = []; const maxPages = Math.min(pdf.numPages, 20); for (let i = 1; i <= maxPages; i++) { setProcessingMsg(`מעבד עמוד ${i}...`); const page = await pdf.getPage(i); const viewport = page.getViewport({ scale: 2.0 }); const canvas = document.createElement('canvas'); canvas.width = viewport.width; canvas.height = viewport.height; const ctx = canvas.getContext('2d'); await page.render({ canvasContext: ctx, viewport }).promise; newPages.push({ id: uid(), pageNumber: i, image: canvas.toDataURL('image/jpeg', 0.8), tables: [] }); } setPages(newPages); setData({}); setCellStyles({}); setAppMode('editor'); } catch(err) { alert("שגיאה בטעינת הקובץ"); } finally { setIsProcessing(false); } };
 
             // --- RENDER ---
             
-            // 1. Initial Loader
-            if (viewState === 'initial-loading') {
-                return (
-                    <div className="loader-container">
-                        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-600"></div>
-                        <p className="mt-4 font-bold text-slate-600">טוען נתונים...</p>
-                    </div>
-                );
+            if (appMode === 'initial-loading') {
+                return <div className="loader-container"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-600"></div></div>;
             }
 
-            // 2. Fallback: No Template Found (Simple Upload Screen)
-            if (viewState === 'no-template') {
+            if (appMode === 'no-template') {
                  return (
                     <div className="loader-container">
                         <Icon name="FileX" size={64} className="text-slate-300 mb-4" />
                         <h2 className="text-2xl font-bold mb-2">לא נמצאה תבנית</h2>
-                        <p className="text-slate-500 mb-6">אנא ודא שקובץ info.json נמצא בתיקייה, או טען ידנית.</p>
-                        <label className="btn btn-primary cursor-pointer px-6 py-3">
-                            <Icon name="Upload" />
-                            טען קובץ תבנית
-                            <input type="file" accept=".json" onChange={handleManualUpload} className="hidden" />
-                        </label>
+                        <div className="flex gap-4">
+                            <label className="btn btn-primary cursor-pointer px-6 py-3">
+                                <Icon name="Upload" />
+                                טען תבנית
+                                <input type="file" accept=".json" onChange={handleManualUpload} className="hidden" />
+                            </label>
+                            <label className="btn btn-secondary cursor-pointer px-6 py-3">
+                                <Icon name="FileUp" />
+                                צור חדש מ-PDF
+                                <input type="file" accept="application/pdf" onChange={handlePdfUpload} className="hidden" />
+                            </label>
+                        </div>
                     </div>
                 );
             }
 
-            // 3. Wizard Screen
-            if (viewState === 'wizard') {
+            if (appMode === 'wizard') {
                 return (
                     <div className="hero-overlay">
                         <div className="glass-card fade-in">
-                            <div className="flex justify-center mb-6 text-yellow-600">
-                                <Icon name="Scroll" size={48} />
-                            </div>
-                            
+                            <div className="flex justify-center mb-6 text-yellow-600"><Icon name="Scroll" size={48} /></div>
                             <h1 className="text-3xl font-bold title-serif mb-2">מחולל לוחות לימוד</h1>
-                            <p className="text-slate-500 mb-8">הזן את הפרטים ליצירת הלוח באופן אוטומטי</p>
-
+                            <p className="text-slate-500 mb-8">הזן פרטים ליצירה אוטומטית</p>
                             <div className="space-y-6">
                                 <div className="input-wrapper">
-                                    <label className="input-label">תאריך סיום הלימוד (יעד)</label>
+                                    <label className="input-label">תאריך סיום (יעד)</label>
                                     <div className="flex gap-3">
-                                        <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">
-                                            {Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}
-                                        </select>
-                                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">
-                                            {availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}
-                                        </select>
-                                        <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">
-                                            {years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}
-                                        </select>
+                                        <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
+                                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">{availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}</select>
+                                        <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">{years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}</select>
                                     </div>
                                 </div>
-
                                 <div className="input-wrapper">
-                                    <label className="input-label">הקדשה / שם המנוח (אופציונלי)</label>
-                                    <input 
-                                        type="text" 
-                                        className="fancy-input"
-                                        placeholder="לדוגמה: יוסף בן דוד ז״ל"
-                                        value={deceasedName}
-                                        onChange={e => setDeceasedName(e.target.value)}
-                                    />
+                                    <label className="input-label">הקדשה / שם המנוח</label>
+                                    <input type="text" className="fancy-input" placeholder="למשל: יוסף בן דוד ז״ל" value={deceasedName} onChange={e => setDeceasedName(e.target.value)} />
                                 </div>
-
-                                <button onClick={handleWizardSubmit} className="generate-btn w-full justify-center mt-4">
-                                    <Icon name="Sparkles" />
-                                    צור לוח לימוד
-                                </button>
+                                <button onClick={handleWizardSubmit} className="generate-btn w-full justify-center mt-4"><Icon name="Sparkles" /> צור לוח לימוד</button>
+                                {/* Removed Skip to Editor Button */}
                             </div>
                         </div>
                     </div>
                 );
             }
 
-            // 4. Result Screen (The Workspace)
+            // --- EDITOR & PREVIEW ---
             return (
                 <div className={`min-h-screen flex flex-col ${showBorders ? 'show-borders' : ''}`}>
-                    {/* Simplified workspace without the complex toolbar */}
+                    
+                    {/* Full Toolbar - Only in Editor Mode */}
+                    {appMode === 'editor' && (
+                        <div className="toolbar">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setAppMode('preview')} className="btn btn-outline btn-sm"><Icon name="ArrowRight" size={14} /> חזרה לתצוגה</button>
+                                <div className="h-6 w-px bg-slate-200"></div>
+                                <h1 className="text-lg font-bold text-slate-700">עורך מתקדם</h1>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setShowBorders(!showBorders)} className={`btn btn-outline btn-icon-only ${showBorders ? 'bg-blue-50 border-blue-300' : ''}`}><Icon name="Grid" size={18} /></button>
+                                <label className="btn btn-secondary btn-sm" title="החלף את תמונות הרקע ב-PDF חדש (שומר נתונים)">
+                                    <Icon name="ImagePlus" size={14} /> החלף רקע PDF
+                                    <input type="file" accept="application/pdf" onChange={handleBackgroundReplace} className="hidden" />
+                                </label>
+                                <button onClick={saveTemplate} className="btn btn-outline btn-sm"><Icon name="Save" size={14} /> שמור תבנית</button>
+                                <button onClick={() => window.print()} className="btn btn-primary btn-sm"><Icon name="Printer" size={14} /> הדפס</button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="workspace">
+                        {isProcessing && (
+                            <div className="fixed inset-0 bg-white/80 z-[999] flex items-center justify-center flex-col">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
+                                <span className="font-bold text-lg text-emerald-800">{processingMsg}</span>
+                            </div>
+                        )}
+
                         {pages.map((page, index) => (
                             <div key={page.id} className="page-wrapper">
-                                <div className="page-container">
+                                <div className="page-container" onMouseDown={(e) => handleMouseDown(e, page.id)} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
                                     <img src={page.image} className="pdf-bg-img" alt={`Page ${index+1}`} />
                                     
-                                    <div className={`interaction-layer ${mode === 'edit' ? 'edit-mode' : 'view-mode'}`}>
+                                    <div className={`interaction-layer ${appMode === 'editor' ? 'edit-mode' : 'view-mode'}`}>
+                                        {appMode === 'editor' && (
+                                            <button className="delete-page-btn" onClick={() => deletePage(page.id)} title="מחק עמוד זה">
+                                                <Icon name="Trash" size={16} />
+                                            </button>
+                                        )}
+
                                         {page.tables.map(t => {
                                             const cellW = t.w / t.cols;
                                             const cellH = t.h / t.rows;
@@ -800,28 +743,46 @@
                                             for(let r=0; r<t.rows; r++) {
                                                 for(let c=0; c<t.cols; c++) {
                                                     const cellId = `${t.id}_${r}_${c}`;
+                                                    const isSelected = cellSelection && cellSelection.tableId === t.id && r >= Math.min(cellSelection.startR, cellSelection.endR) && r <= Math.max(cellSelection.startR, cellSelection.endR) && c >= Math.min(cellSelection.startC, cellSelection.endC) && c <= Math.max(cellSelection.startC, cellSelection.endC);
                                                     cells.push(
-                                                        <input 
-                                                            key={cellId} 
-                                                            id={cellId} 
-                                                            className="cell-input" 
-                                                            style={{
-                                                                right: `${c * cellW}px`, 
-                                                                top: `${r * cellH}px`, 
-                                                                width: `${cellW}px`, 
-                                                                height: `${cellH}px`,
-                                                                ...(cellStyles[cellId] || {})
-                                                            }} 
-                                                            value={data[cellId] || ""} 
-                                                            readOnly={mode !== 'edit'} 
-                                                            autoComplete="off" 
+                                                        <input key={cellId} id={cellId} className={`cell-input ${isSelected ? 'bg-blue-50' : ''}`} 
+                                                            style={{ right: `${c * cellW}px`, top: `${r * cellH}px`, width: `${cellW}px`, height: `${cellH}px`, ...(cellStyles[cellId] || {}), pointerEvents: appMode === 'preview' ? 'none' : 'auto' }} 
+                                                            readOnly={appMode === 'preview'}
+                                                            value={data[cellId] || ""} onChange={(e) => handleInputChange(t.id, r, c, e.target.value)} 
+                                                            onKeyDown={(e) => handleKeyDown(e, t.id, r, c, t.rows, t.cols)} onMouseDown={(e) => handleCellMouseDown(e, t.id, r, c)} 
+                                                            onMouseEnter={(e) => handleCellMouseEnter(e, t.id, r, c)} tabIndex={appMode === 'editor' ? -1 : 0} autoComplete="off" 
                                                         />
                                                     );
                                                 }
                                             }
+
+                                            let selectionOverlay = null;
+                                            if (cellSelection && cellSelection.tableId === t.id && appMode !== 'editor') {
+                                                const r1 = Math.min(cellSelection.startR, cellSelection.endR); const r2 = Math.max(cellSelection.startR, cellSelection.endR);
+                                                const c1 = Math.min(cellSelection.startC, cellSelection.endC); const c2 = Math.max(cellSelection.startC, cellSelection.endC);
+                                                selectionOverlay = (<div className="selection-overlay" style={{ top: `${r1 * cellH}px`, right: `${c1 * cellW}px`, height: `${(r2 - r1 + 1) * cellH}px`, width: `${(c2 - c1 + 1) * cellW}px` }}><div className="fill-handle" onMouseDown={handleFillHandleMouseDown}></div></div>);
+                                            }
+                                            
+                                            let fillOverlay = null;
+                                            if (isFilling && fillTarget && cellSelection && cellSelection.tableId === t.id) {
+                                                 const fullR1 = Math.min(Math.min(cellSelection.startR, cellSelection.endR), fillTarget.endR); const fullR2 = Math.max(Math.max(cellSelection.startR, cellSelection.endR), fillTarget.endR);
+                                                 const fullC1 = Math.min(Math.min(cellSelection.startC, cellSelection.endC), fillTarget.endC); const fullC2 = Math.max(Math.max(cellSelection.startC, cellSelection.endC), fillTarget.endC);
+                                                 fillOverlay = ( <div className="fill-target-overlay" style={{ top: `${fullR1 * cellH}px`, right: `${fullC1 * cellW}px`, height: `${(fullR2 - fullR1 + 1) * cellH}px`, width: `${(fullC2 - fullC1 + 1) * cellW}px` }}></div> );
+                                            }
+
                                             return (
                                                 <div key={t.id} className="grid-container" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` }}>
-                                                    {cells}
+                                                    {appMode === 'editor' && (
+                                                        <div className="action-btn-group">
+                                                            <div className="mini-btn bg-purple" onClick={(e) => { e.stopPropagation(); refineTablePosition(index, t.id); }} title="דייק מיקום טבלה אוטומטית (מטה קסם)">
+                                                                <Icon name="Wand2" size={14} />
+                                                            </div>
+                                                            <div className="mini-btn bg-red" onClick={(e) => { e.stopPropagation(); deleteTable(page.id, t.id); }}>
+                                                                <Icon name="Trash2" size={14} />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {cells} {selectionOverlay} {fillOverlay}
                                                 </div>
                                             );
                                         })}
@@ -829,19 +790,32 @@
                                 </div>
                             </div>
                         ))}
+                        {selection && ( <div className="selection-box" style={{ display: 'none' }} /> )}
                     </div>
 
-                    <div className="floating-toolbar">
-                        <button onClick={() => window.print()} className="btn btn-primary">
-                            <Icon name="Printer" />
-                            הדפס / שמור כ-PDF
-                        </button>
-                        <div className="w-px bg-slate-200 mx-1"></div>
-                        <button onClick={() => setViewState('wizard')} className="btn btn-secondary">
-                            <Icon name="ArrowRight" />
-                            ערוך נתונים
-                        </button>
-                    </div>
+                    {/* Floating Toolbar - Only in Preview Mode */}
+                    {appMode === 'preview' && (
+                        <div className="floating-toolbar">
+                            <button onClick={() => window.print()} className="btn btn-primary"><Icon name="Printer" /> הדפס / שמור כ-PDF</button>
+                            <div className="w-px bg-slate-200 mx-1"></div>
+                            {/* Removed Edit Button */}
+                            <button onClick={() => window.location.reload()} className="btn btn-outline"><Icon name="RotateCcw" /> חזרה לעריכה</button>
+                        </div>
+                    )}
+
+                    {pendingTable && (
+                        <div className="popover" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1000 }}>
+                            <h3 className="font-bold text-sm mb-2 text-slate-700">הגדרת טבלה חדשה</h3>
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                                <div><label className="text-xs text-slate-500 block mb-1">שורות</label><input type="number" className="w-full border rounded px-2 py-1 text-sm" value={newTableConfig.rows} onChange={e => setNewTableConfig({...newTableConfig, rows: e.target.value})} min="1" /></div>
+                                <div><label className="text-xs text-slate-500 block mb-1">עמודות</label><input type="number" className="w-full border rounded px-2 py-1 text-sm" value={newTableConfig.cols} onChange={e => setNewTableConfig({...newTableConfig, cols: e.target.value})} min="1" /></div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={confirmTable} className="btn btn-primary text-xs w-full justify-center">צור טבלה</button>
+                                <button onClick={() => setPendingTable(null)} className="btn btn-outline text-xs">ביטול</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
