@@ -41,8 +41,8 @@
         --excel-green: #107c41;
         --selection-blue: rgba(59, 130, 246, 0.2);
         --selection-border: #3b82f6;
-        --primary-green: #00402e; /* Updated to match site */
-        --accent-gold: #e5c98d;   /* Updated to match site buttons */
+        --primary-green: #00402e; 
+        --accent-gold: #e5c98d;   
         --light-cream: #f9f5eb;
         --dark-text: #003324;
       }
@@ -117,7 +117,7 @@
         width: 100%;
         padding: 0.75rem 1rem;
         border: 1px solid #cbd5e1;
-        border-radius: 50px; /* Rounded pill style */
+        border-radius: 50px; 
         font-size: 1rem;
         transition: all 0.2s;
         background: white;
@@ -194,13 +194,6 @@
         gap: 0.5rem;
       }
       
-      .page-label {
-        color: #e2e8f0;
-        font-weight: bold;
-        font-size: 0.875rem;
-        text-align: center;
-      }
-
       .page-container {
         width: var(--print-width); 
         height: var(--print-height); 
@@ -261,14 +254,7 @@
       .mini-btn:active { transform: scale(0.9); }
       .bg-red { background: #ef4444; }
       .bg-blue { background: #3b82f6; }
-      .bg-purple { background: #8b5cf6; }
       .bg-emerald { background: #10b981; }
-
-      .delete-page-btn {
-        position: absolute; top: 0; left: -40px;
-        background: #ef4444; color: white; padding: 8px;
-        border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      }
 
       .cell-input {
         position: absolute;
@@ -307,14 +293,6 @@
         animation: slideUp 0.5s ease-out;
       }
       
-      @media (max-width: 640px) {
-        .floating-toolbar {
-            width: 92%;
-            bottom: 1rem;
-            padding: 0.5rem;
-        }
-      }
-
       .btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 999px; font-weight: 600; transition: all 0.2s; cursor: pointer; font-size: 0.95rem; border: none; }
       .btn-primary { background: var(--accent-gold); color: var(--primary-green); }
       .btn-secondary { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3); }
@@ -324,7 +302,7 @@
       @media print {
         @page { margin: 0; size: A4 portrait; }
         body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .hero-overlay, .floating-toolbar, .toolbar, .action-btn-group, .delete-page-btn, .popover, .no-print { display: none !important; }
+        .hero-overlay, .floating-toolbar, .toolbar, .action-btn-group, .popover, .no-print { display: none !important; }
         .workspace { display: block; padding: 0; margin: 0; background: white; }
         .page-wrapper { margin: 0; padding: 0; page-break-after: always; break-after: page; }
         .page-container { box-shadow: none; margin: 0; width: 210mm; height: 297mm; transform: none !important; border: none; }
@@ -334,9 +312,9 @@
       .logo-img {
         max-width: 180px;
         margin-bottom: 1rem;
+        display: block;
       }
 
-      /* Radio Buttons for Wizard Calc Selection */
       .calc-toggle {
         display: flex;
         background: #f1f5f9;
@@ -357,6 +335,14 @@
       .calc-option.active {
         background: var(--primary-green);
         color: white;
+      }
+
+      .selection-overlay {
+        position: absolute;
+        border: 2px solid var(--selection-border);
+        background: var(--selection-blue);
+        pointer-events: none;
+        z-index: 100;
       }
     </style>
 </head>
@@ -395,44 +381,43 @@
             const [showBorders, setShowBorders] = useState(false); 
             const [selection, setSelection] = useState(null);
             const [pendingTable, setPendingTable] = useState(null);
-            const [cellSelection, setCellSelection] = useState(null);
-            const [isSelectingCells, setIsSelectingCells] = useState(false);
             const [showSettings, setShowSettings] = useState(false);
 
-            // Authentication and Template
             const [password, setPassword] = useState("");
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [templateMeta, setTemplateMeta] = useState({ 
-                calcMethod: 'backward', // Current calculation mode used in the logic
-                calcMethodType: 'fixed-backward', // 'fixed-backward', 'fixed-forward', or 'user-selectable'
+                calcMethod: 'backward', 
+                calcMethodType: 'fixed-backward', 
                 wizardTitles: { main: "מחולל לוחות לימוד", dateLabel: "תאריך יעד" },
                 nameLabel: "הקדשה / שם המנוח",
                 namePlaceholder: "למשל: יוסף בן דוד ז״ל",
                 showNameField: true
             });
 
-            // Draggable State
             const [dragInfo, setDragInfo] = useState(null);
-
             const activePageRef = useRef(null);
             const [newTableConfig, setNewTableConfig] = useState({ rows: 30, cols: 4 });
 
-            // --- WIZARD INPUTS ---
             const [deceasedName, setDeceasedName] = useState("");
-            const [wizardCalcMode, setWizardCalcMode] = useState('backward'); // For user-selectable mode
+            const [wizardCalcMode, setWizardCalcMode] = useState('backward'); 
             const today = new HDate();
             const [selectedYear, setSelectedYear] = useState(today.getFullYear());
             const [selectedMonth, setSelectedMonth] = useState(today.getMonthName());
             const [selectedDay, setSelectedDay] = useState(today.getDate());
 
-            // --- AUTO LOAD LOGIC & ROUTING ---
             useEffect(() => {
                 const urlParams = new URLSearchParams(window.location.search);
-                const templateId = urlParams.get('t');
+                const searchStr = window.location.search.substring(1);
                 const mode = urlParams.get('mode');
+                
+                // Smart template loading: ?13 -> 13.json, ?t=13 -> 13.json
+                let templateId = urlParams.get('t');
+                if (!templateId && searchStr && !isNaN(searchStr)) {
+                    templateId = searchStr;
+                }
 
                 const tryLoadTemplate = async () => {
-                    const filename = templateId ? `template_${templateId}.json` : 'info.json';
+                    const filename = templateId ? `${templateId}.json` : 'info.json';
                     try {
                         const response = await fetch(filename);
                         if (!response.ok) throw new Error("Template not found");
@@ -445,13 +430,9 @@
                 };
 
                 const proceed = () => {
-                    if (mode === 'edit' && !isAuthenticated) {
-                        setAppMode('lock-screen');
-                    } else if (mode === 'edit' && isAuthenticated) {
-                        setAppMode('editor');
-                    } else {
-                        setAppMode('wizard');
-                    }
+                    if (mode === 'edit' && !isAuthenticated) setAppMode('lock-screen');
+                    else if (mode === 'edit' && isAuthenticated) setAppMode('editor');
+                    else setAppMode('wizard');
                 };
 
                 tryLoadTemplate();
@@ -510,7 +491,6 @@
                 } catch(err) { alert("שגיאה בטעינת ה-PDF"); } finally { setIsProcessing(false); }
             };
 
-            // --- DATE LOGIC ---
             const isLeap = useMemo(() => { try { return HDate.isLeapYear(parseInt(selectedYear)); } catch(e) { return false; } }, [selectedYear]);
             const availableMonths = useMemo(() => { return [ "Tishrei", "Cheshvan", "Kislev", "Tevet", "Sh'vat", ...(isLeap ? ["Adar I", "Adar II"] : ["Adar"]), "Nisan", "Iyar", "Sivan", "Tamuz", "Av", "Elul" ]; }, [isLeap]);
             useEffect(() => { if (!availableMonths.includes(selectedMonth)) { if (selectedMonth.includes("Adar")) setSelectedMonth(isLeap ? "Adar II" : "Adar"); else setSelectedMonth(availableMonths[0]); } }, [selectedYear, isLeap, availableMonths]);
@@ -555,7 +535,6 @@
                     let startDate, endDate;
                     const groupMonths = {}; 
 
-                    // Decide calc method based on template config or user choice
                     const effectiveCalcMethod = templateMeta.calcMethodType === 'user-selectable' ? wizardCalcMode : (templateMeta.calcMethodType === 'fixed-forward' ? 'forward' : 'backward');
 
                     if (effectiveCalcMethod === 'forward') {
@@ -582,8 +561,15 @@
                         }
                     }
 
-                    monthCells.forEach(item => { const months = groupMonths[item.group]; if (months && months.size > 0) { newData[item.key] = Array.from(months).reverse().join(' - '); newStyles[item.key] = stylesMap.month; } });
                     const formatFullDate = (d) => { const yHeb = typeof gematriya === 'function' ? gematriya(d.getFullYear()) : d.getFullYear(); const dHeb = typeof gematriya === 'function' ? gematriya(d.getDate()) : d.getDate(); const mHeb = monthHebrewNames[d.getMonthName()] || d.getMonthName(); return `${dHeb} ${mHeb} ${yHeb}`; };
+
+                    // Warn if backward calculation starts in the past
+                    const todayH = new HDate();
+                    if (effectiveCalcMethod === 'backward' && startDate.abs() < todayH.abs()) {
+                        alert(`שים לב: לפי תאריך היעד שבחרת, הלימוד היה צריך להתחיל ב-${formatFullDate(startDate)}. תאריך זה כבר עבר.`);
+                    }
+
+                    monthCells.forEach(item => { const months = groupMonths[item.group]; if (months && months.size > 0) { newData[item.key] = Array.from(months).reverse().join(' - '); newStyles[item.key] = stylesMap.month; } });
                     findCells(/\{\{start\}\}/i).forEach(c => { newData[c.key] = formatFullDate(startDate); newStyles[c.key] = stylesMap.meta; });
                     findCells(/\{\{end\}\}/i).forEach(c => { newData[c.key] = formatFullDate(endDate); newStyles[c.key] = stylesMap.meta; });
 
@@ -592,13 +578,10 @@
                 } catch (e) { console.error(e); alert("שגיאה ביצירת הלוח"); }
             };
 
-            // --- DRAGGING LOGIC ---
             const startDragging = (e, pageId, tableId) => {
                 if (appMode !== 'editor') return;
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 const page = pages.find(p => p.id === pageId);
-                const table = page.tables.find(t => t.id === tableId);
                 const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
                 setDragInfo({ pageId, tableId, offsetX: (e.clientX - rect.left) / previewScale, offsetY: (e.clientY - rect.top) / previewScale });
             };
@@ -630,12 +613,10 @@
                 }
             };
 
-            // --- MISC UTILS ---
             const saveTemplate = () => { const template = { version: 2, pages, data, styles: cellStyles, meta: templateMeta }; const blob = new Blob([JSON.stringify(template)], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "template.json"; a.click(); };
             const deleteTable = (pageId, tableId) => { if (confirm("למחוק טבלה?")) setPages(prev => prev.map(p => p.id !== pageId ? p : { ...p, tables: p.tables.filter(t => t.id !== tableId) })); };
             const confirmTable = () => { if (!pendingTable) return; setPages(prev => prev.map(p => p.id !== pendingTable.pageId ? p : { ...p, tables: [...p.tables, { id: uid(), x: pendingTable.x, y: pendingTable.y, w: pendingTable.w, h: pendingTable.h, rows: parseInt(newTableConfig.rows) || 30, cols: parseInt(newTableConfig.cols) || 4 }] })); setPendingTable(null); };
 
-            // --- RENDERING ---
             if (appMode === 'initial-loading') return <div className="loader-container"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-800"></div></div>;
 
             if (appMode === 'lock-screen') {
@@ -655,8 +636,8 @@
                 return (
                     <div className="hero-overlay">
                         <div className="glass-card fade-in">
-                            <img src="https://mishnayothalperin.co.il/wp-content/uploads/2021/01/logo.png" alt="דף היומי במשניות" className="logo-img mx-auto" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block'; }} />
-                            <div style={{display:'none'}} className="title-serif text-3xl font-bold mb-4">{templateMeta.wizardTitles.main}</div>
+                            <img src="logo.png" alt="דף היומי במשניות" className="logo-img mx-auto" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block'; }} />
+                            <div style={{display:'none'}} className="title-serif text-3xl font-bold mb-4 text-primary-green">דף היומי במשניות</div>
                             
                             <h1 className="text-2xl font-bold title-serif mb-6">{templateMeta.wizardTitles.main}</h1>
                             <div className="space-y-5">
@@ -699,7 +680,7 @@
                     {appMode === 'editor' && (
                         <div className="toolbar">
                             <div className="flex items-center gap-4">
-                                <button onClick={() => setAppMode('wizard')} className="btn btn-secondary btn-sm"><Icon name="ArrowRight" size={14} /> חזרה</button>
+                                <button onClick={() => window.location.reload()} className="btn btn-secondary btn-sm"><Icon name="ArrowRight" size={14} /> חזרה</button>
                                 <h1 className="text-lg font-bold">עורך תבנית - דף היומי במשניות</h1>
                             </div>
                             <div className="flex items-center gap-2">
@@ -723,7 +704,7 @@
                                         {page.tables.map(t => {
                                             const cW = t.w / t.cols, cH = t.h / t.rows;
                                             return (
-                                                <div key={t.id} className="grid-container" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px`, cursor: appMode === 'editor' ? 'default' : 'text' }}>
+                                                <div key={t.id} className="grid-container" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` }}>
                                                     {appMode === 'editor' && (
                                                         <div className="action-btn-group">
                                                             <div className="mini-btn bg-emerald" onMouseDown={(e) => startDragging(e, page.id, t.id)} title="הזז טבלה"><Icon name="Move" size={14} /></div>
@@ -750,7 +731,7 @@
                         <div className="floating-toolbar">
                             <button onClick={() => window.print()} className="btn btn-primary"><Icon name="Printer" /> הדפס / שמור כ-PDF</button>
                             <div className="w-px bg-slate-200 mx-1"></div>
-                            <button onClick={() => setAppMode('wizard')} className="btn btn-outline"><Icon name="RotateCcw" /> חזרה לוויזארד</button>
+                            <button onClick={() => window.location.reload()} className="btn btn-outline"><Icon name="RotateCcw" /> חזרה</button>
                         </div>
                     )}
 
@@ -818,4 +799,3 @@
     </script>
 </body>
 </html>
-
