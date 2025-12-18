@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מחולל לוחות לימוד מתקדם</title>
+    <title>מחולל לוחות לימוד - דף היומי במשניות</title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,13 +41,15 @@
         --excel-green: #107c41;
         --selection-blue: rgba(59, 130, 246, 0.2);
         --selection-border: #3b82f6;
-        --gold: #c5a059;
-        --dark-blue: #1e293b;
+        --primary-green: #00402e; /* Updated to match site */
+        --accent-gold: #e5c98d;   /* Updated to match site buttons */
+        --light-cream: #f9f5eb;
+        --dark-text: #003324;
       }
 
       body {
         font-family: 'Assistant', sans-serif;
-        background-color: #f8fafc;
+        background-color: #f1f5f1;
         margin: 0;
         overflow-x: hidden;
       }
@@ -56,7 +58,8 @@
       .hero-overlay {
         position: fixed;
         inset: 0;
-        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        background: var(--primary-green);
+        background-image: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 70%);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -65,13 +68,13 @@
       }
 
       .glass-card {
-        background: rgba(255, 255, 255, 0.95);
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.98);
+        border: 1px solid rgba(255,255,255,0.2);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         border-radius: 1.5rem;
-        padding: 3rem;
+        padding: 2.5rem;
         width: 100%;
-        max-width: 600px;
+        max-width: 550px;
         text-align: center;
         position: relative;
         overflow: hidden;
@@ -80,7 +83,7 @@
       @media (max-width: 640px) {
           .glass-card {
               padding: 1.5rem;
-              max-height: 90vh;
+              max-height: 95vh;
               overflow-y: auto;
           }
       }
@@ -88,25 +91,25 @@
       .glass-card::before {
         content: "";
         position: absolute;
-        top: 0; left: 0; right: 0; height: 6px;
-        background: linear-gradient(90deg, #c5a059, #fcd34d, #c5a059);
+        top: 0; left: 0; right: 0; height: 8px;
+        background: var(--accent-gold);
       }
 
       .title-serif {
         font-family: 'Frank Ruhl Libre', serif;
-        color: var(--dark-blue);
+        color: var(--primary-green);
       }
 
       .input-wrapper {
         text-align: right;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.25rem;
       }
 
       .input-label {
         display: block;
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #475569;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--primary-green);
         margin-bottom: 0.5rem;
       }
 
@@ -114,27 +117,28 @@
         width: 100%;
         padding: 0.75rem 1rem;
         border: 1px solid #cbd5e1;
-        border-radius: 0.5rem;
-        font-size: 1.1rem;
+        border-radius: 50px; /* Rounded pill style */
+        font-size: 1rem;
         transition: all 0.2s;
         background: white;
+        color: var(--dark-text);
       }
       .fancy-input:focus {
-        border-color: var(--gold);
+        border-color: var(--accent-gold);
         outline: none;
-        box-shadow: 0 0 0 3px rgba(197, 160, 89, 0.2);
+        box-shadow: 0 0 0 3px rgba(229, 201, 141, 0.3);
       }
 
       .generate-btn {
-        background: var(--dark-blue);
-        color: white;
+        background: var(--accent-gold);
+        color: var(--primary-green);
         font-size: 1.25rem;
-        font-weight: 700;
-        padding: 1rem 3rem;
+        font-weight: 800;
+        padding: 0.75rem 3rem;
         border-radius: 50px;
         border: none;
         cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
+        transition: all 0.2s;
         display: inline-flex;
         align-items: center;
         gap: 0.75rem;
@@ -143,7 +147,7 @@
       .generate-btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 10px 15px rgba(0,0,0,0.2);
-        background: #0f172a;
+        background: #f1d9a5;
       }
       
       .loader-container {
@@ -153,24 +157,23 @@
         justify-content: center;
         height: 100vh;
         gap: 1.5rem;
-        color: #475569;
+        color: var(--primary-green);
         background: #f8fafc;
       }
 
       /* --- EDITOR / WORKSPACE STYLES --- */
       .toolbar {
-        background: white;
-        padding: 0.5rem 1rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        background: var(--primary-green);
+        padding: 0.5rem 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
         position: sticky;
         top: 0;
         z-index: 50;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-bottom: 1px solid #cbd5e1;
         height: 70px;
-        transition: all 0.3s ease;
+        color: white;
       }
 
       .workspace {
@@ -181,8 +184,7 @@
         gap: 2rem;
         min-height: calc(100vh - 70px);
         overflow: auto;
-        /* Default bg for workspace */
-        background-color: #52525b; 
+        background-color: #3b4d44; 
       }
 
       .page-wrapper {
@@ -204,7 +206,7 @@
         height: var(--print-height); 
         background-color: white;
         position: relative;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
         user-select: none;
         overflow: hidden;
       }
@@ -225,18 +227,18 @@
 
       .interaction-layer.edit-mode {
         cursor: crosshair;
-        background: rgba(0,0,0,0.05); 
+        background: rgba(0,0,0,0.02); 
       }
 
       .grid-container {
         position: absolute;
         border: 2px solid transparent;
-        transition: border 0.2s;
+        transition: border 0.1s;
         direction: rtl; 
       }
       .edit-mode .grid-container {
-        border: 2px dashed #3b82f6;
-        background: rgba(59, 130, 246, 0.1);
+        border: 2px dashed rgba(59, 130, 246, 0.5);
+        background: rgba(59, 130, 246, 0.05);
         pointer-events: auto; 
       }
       .grid-container:hover .action-btn-group { opacity: 1; }
@@ -249,22 +251,24 @@
       }
 
       .mini-btn {
-        width: 24px; height: 24px;
+        width: 26px; height: 26px;
         border-radius: 4px;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer; color: white;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        transition: transform 0.1s;
       }
+      .mini-btn:active { transform: scale(0.9); }
       .bg-red { background: #ef4444; }
       .bg-blue { background: #3b82f6; }
       .bg-purple { background: #8b5cf6; }
+      .bg-emerald { background: #10b981; }
 
       .delete-page-btn {
         position: absolute; top: 0; left: -40px;
         background: #ef4444; color: white; padding: 8px;
         border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       }
-      .delete-page-btn:hover { background: #dc2626; }
 
       .cell-input {
         position: absolute;
@@ -284,16 +288,8 @@
         line-height: 1;
       }
       .show-borders .cell-input { border: 1px solid rgba(0,0,0,0.2) !important; }
-      .show-borders .cell-input:focus { border: 2px solid var(--excel-green) !important; }
-      .edit-mode .cell-input { border: 1px solid rgba(0,0,0,0.1); pointer-events: none; }
+      .edit-mode .cell-input { border: 1px solid rgba(0,0,0,0.05); pointer-events: none; }
       .view-mode .cell-input { pointer-events: auto; }
-
-      .selection-overlay { position: absolute; border: 2px solid var(--selection-border); background-color: var(--selection-blue); pointer-events: none; z-index: 40; }
-      .fill-handle { position: absolute; width: 8px; height: 8px; background-color: var(--selection-border); border: 1px solid white; bottom: -5px; left: -5px; cursor: crosshair; pointer-events: auto; z-index: 50; }
-      .fill-target-overlay { position: absolute; border: 2px dashed #64748b; background-color: rgba(100, 116, 139, 0.1); pointer-events: none; z-index: 39; }
-      .view-mode .cell-input:hover { border: 1px solid #94a3b8; background: rgba(255,255,255,0.8); z-index: 20; }
-      .view-mode .cell-input:focus { background: #ffffff; border: 2px solid var(--excel-green); z-index: 30; font-weight: bold; }
-      .selection-box { position: absolute; border: 2px solid var(--excel-green); background: rgba(16, 124, 65, 0.2); pointer-events: none; z-index: 100; }
 
       .floating-toolbar {
         position: fixed;
@@ -303,7 +299,7 @@
         background: white;
         padding: 0.75rem 1.5rem;
         border-radius: 50px;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
         display: flex;
         gap: 1rem;
         z-index: 50;
@@ -314,64 +310,53 @@
       @media (max-width: 640px) {
         .floating-toolbar {
             width: 92%;
-            max-width: none;
-            padding: 0.4rem;
             bottom: 1rem;
-            flex-wrap: nowrap;
-            justify-content: space-evenly;
-            gap: 0.25rem;
-        }
-        .floating-toolbar .w-px { display: none; }
-        .btn {
-            font-size: 0.75rem !important; /* Force smaller font */
-            padding: 0.5rem 0.4rem !important;
-            white-space: nowrap;
-            flex: 1;
-            justify-content: center;
-        }
-        .btn svg {
-            width: 14px; height: 14px;
-        }
-        .workspace {
-            padding: 0.5rem 0 !important;
-            overflow-x: hidden;
-            width: 100vw;
+            padding: 0.5rem;
         }
       }
 
-      .popover {
-        position: absolute;
-        background: white;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-        z-index: 200;
-        border: 1px solid #e2e8f0;
-        width: 220px;
-        direction: rtl;
-      }
-
-      .btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 999px; font-weight: 600; transition: all 0.2s; cursor: pointer; font-size: 0.9rem; border: none; }
-      .btn-sm { padding: 0.3rem 0.8rem; font-size: 0.8rem; }
-      .btn-primary { background: var(--dark-blue); color: white; }
-      .btn-primary:hover { background: #334155; }
-      .btn-secondary { background: #f1f5f9; color: #475569; }
-      .btn-secondary:hover { background: #e2e8f0; }
-      .btn-outline { background: white; border: 1px solid #cbd5e1; color: #334155; }
-      .btn-outline:hover { background: #f1f5f9; }
-      .btn-danger { background: #ef4444; color: white; }
+      .btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 999px; font-weight: 600; transition: all 0.2s; cursor: pointer; font-size: 0.95rem; border: none; }
+      .btn-primary { background: var(--accent-gold); color: var(--primary-green); }
+      .btn-secondary { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3); }
+      .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+      .btn-outline { background: white; border: 1px solid #cbd5e1; color: var(--primary-green); }
 
       @media print {
         @page { margin: 0; size: A4 portrait; }
         body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .hero-overlay, .floating-toolbar, .toolbar, .action-btn-group, .delete-page-btn, .selection-box, .no-print, .page-label, .selection-overlay, .fill-handle, .fill-target-overlay, .popover { display: none !important; }
-        .workspace { display: block; padding: 0; margin: 0; gap: 0; background: white; }
+        .hero-overlay, .floating-toolbar, .toolbar, .action-btn-group, .delete-page-btn, .popover, .no-print { display: none !important; }
+        .workspace { display: block; padding: 0; margin: 0; background: white; }
         .page-wrapper { margin: 0; padding: 0; page-break-after: always; break-after: page; }
-        .page-container { box-shadow: none; margin: 0; width: 210mm; height: 297mm; transform: none !important; border: none; overflow: hidden; }
-        .page-wrapper:last-child { page-break-after: auto; }
+        .page-container { box-shadow: none; margin: 0; width: 210mm; height: 297mm; transform: none !important; border: none; }
         .cell-input { border: none !important; background: transparent !important; }
-        .cell-input:placeholder-shown { display: none; }
-        .pdf-bg-img { display: block !important; width: 100% !important; height: 100% !important; }
+      }
+
+      .logo-img {
+        max-width: 180px;
+        margin-bottom: 1rem;
+      }
+
+      /* Radio Buttons for Wizard Calc Selection */
+      .calc-toggle {
+        display: flex;
+        background: #f1f5f9;
+        padding: 4px;
+        border-radius: 50px;
+        margin-top: 0.5rem;
+      }
+      .calc-option {
+        flex: 1;
+        padding: 8px;
+        border-radius: 50px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 700;
+        transition: all 0.2s;
+        text-align: center;
+      }
+      .calc-option.active {
+        background: var(--primary-green);
+        color: white;
       }
     </style>
 </head>
@@ -382,7 +367,6 @@
         const { useState, useEffect, useRef, useMemo } = React;
         const { HDate, gematriya } = window.hebcal;
         
-        const EMBEDDED_TEMPLATE = null; 
         const uid = () => Math.random().toString(36).substr(2, 9);
 
         // --- ICONS RENDER HELPER ---
@@ -413,24 +397,29 @@
             const [pendingTable, setPendingTable] = useState(null);
             const [cellSelection, setCellSelection] = useState(null);
             const [isSelectingCells, setIsSelectingCells] = useState(false);
-            const [isFilling, setIsFilling] = useState(false);
-            const [fillTarget, setFillTarget] = useState(null);
             const [showSettings, setShowSettings] = useState(false);
 
-            // New States for Password and Routing
+            // Authentication and Template
             const [password, setPassword] = useState("");
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [templateMeta, setTemplateMeta] = useState({ 
-                calcMethod: 'backward', // 'backward' or 'forward'
-                wizardTitles: { main: "מחולל לוחות לימוד", dateLabel: "תאריך סיום (יעד)" },
+                calcMethod: 'backward', // Current calculation mode used in the logic
+                calcMethodType: 'fixed-backward', // 'fixed-backward', 'fixed-forward', or 'user-selectable'
+                wizardTitles: { main: "מחולל לוחות לימוד", dateLabel: "תאריך יעד" },
+                nameLabel: "הקדשה / שם המנוח",
+                namePlaceholder: "למשל: יוסף בן דוד ז״ל",
                 showNameField: true
             });
+
+            // Draggable State
+            const [dragInfo, setDragInfo] = useState(null);
 
             const activePageRef = useRef(null);
             const [newTableConfig, setNewTableConfig] = useState({ rows: 30, cols: 4 });
 
             // --- WIZARD INPUTS ---
             const [deceasedName, setDeceasedName] = useState("");
+            const [wizardCalcMode, setWizardCalcMode] = useState('backward'); // For user-selectable mode
             const today = new HDate();
             const [selectedYear, setSelectedYear] = useState(today.getFullYear());
             const [selectedMonth, setSelectedMonth] = useState(today.getMonthName());
@@ -444,15 +433,6 @@
 
                 const tryLoadTemplate = async () => {
                     const filename = templateId ? `template_${templateId}.json` : 'info.json';
-                    
-                    if (EMBEDDED_TEMPLATE) {
-                        try {
-                            const json = typeof EMBEDDED_TEMPLATE === 'string' ? JSON.parse(EMBEDDED_TEMPLATE) : EMBEDDED_TEMPLATE;
-                            loadJson(json);
-                            proceed();
-                            return; 
-                        } catch(e) {}
-                    }
                     try {
                         const response = await fetch(filename);
                         if (!response.ok) throw new Error("Template not found");
@@ -478,23 +458,15 @@
             }, [isAuthenticated]);
 
             const handlePasswordSubmit = () => {
-                if (password === "2210") {
-                    setIsAuthenticated(true);
-                } else {
-                    alert("סיסמה שגויה");
-                }
+                if (password === "2210") setIsAuthenticated(true);
+                else alert("סיסמה שגויה");
             };
             
-            // --- SCALE LISTENER ---
             useEffect(() => {
                 const handleResize = () => {
                     const width = window.innerWidth;
-                    if (width < 800) {
-                        const scale = (width - 16) / 794;
-                        setPreviewScale(scale);
-                    } else {
-                        setPreviewScale(1);
-                    }
+                    if (width < 800) setPreviewScale((width - 16) / 794);
+                    else setPreviewScale(1);
                 };
                 window.addEventListener('resize', handleResize);
                 handleResize();
@@ -506,16 +478,13 @@
                     setPages(json.pages); 
                     setData(json.data || {}); 
                     setCellStyles(json.styles || {});
-                    if (json.meta) setTemplateMeta(prev => ({ ...prev, ...json.meta }));
-                    
-                    // Auto-detect name field if not explicitly in meta
-                    const hasNameTag = Object.values(json.data || {}).some(v => String(v).match(/\{\{Name/i));
-                    setTemplateMeta(prev => ({ ...prev, showNameField: hasNameTag }));
-                } 
-                else if (json.bgImage && json.tables) { 
+                    if (json.meta) {
+                        setTemplateMeta(prev => ({ ...prev, ...json.meta }));
+                        setWizardCalcMode(json.meta.calcMethod || 'backward');
+                    }
+                } else if (json.bgImage && json.tables) { 
                     setPages([{ id: uid(), pageNumber: 1, image: json.bgImage, tables: json.tables }]); 
-                    setData({}); 
-                    setCellStyles({});
+                    setData({}); setCellStyles({});
                 } 
             };
 
@@ -533,8 +502,7 @@
                         const viewport = page.getViewport({ scale: 2.0 });
                         const canvas = document.createElement('canvas');
                         canvas.width = viewport.width; canvas.height = viewport.height;
-                        const ctx = canvas.getContext('2d');
-                        await page.render({ canvasContext: ctx, viewport }).promise;
+                        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                         newImages.push(canvas.toDataURL('image/jpeg', 0.8));
                     }
                     setPages(prev => prev.map((p, idx) => newImages[idx] ? { ...p, image: newImages[idx] } : p));
@@ -542,10 +510,10 @@
                 } catch(err) { alert("שגיאה בטעינת ה-PDF"); } finally { setIsProcessing(false); }
             };
 
-            // --- WIZARD LOGIC (DATE HELPERS) ---
+            // --- DATE LOGIC ---
             const isLeap = useMemo(() => { try { return HDate.isLeapYear(parseInt(selectedYear)); } catch(e) { return false; } }, [selectedYear]);
             const availableMonths = useMemo(() => { return [ "Tishrei", "Cheshvan", "Kislev", "Tevet", "Sh'vat", ...(isLeap ? ["Adar I", "Adar II"] : ["Adar"]), "Nisan", "Iyar", "Sivan", "Tamuz", "Av", "Elul" ]; }, [isLeap]);
-            useEffect(() => { if (!availableMonths.includes(selectedMonth)) { if (selectedMonth.includes("Adar")) setSelectedMonth(isLeap ? "Adar II" : "Adar"); else setSelectedMonth(availableMonths[0]); } }, [selectedYear, isLeap]);
+            useEffect(() => { if (!availableMonths.includes(selectedMonth)) { if (selectedMonth.includes("Adar")) setSelectedMonth(isLeap ? "Adar II" : "Adar"); else setSelectedMonth(availableMonths[0]); } }, [selectedYear, isLeap, availableMonths]);
             const years = Array.from({length: 20}, (_, i) => today.getFullYear() - 5 + i);
             const formatHNum = (n) => { const map = {1:'א',2:'ב',3:'ג',4:'ד',5:'ה',6:'ו',7:'ז',8:'ח',9:'ט',10:'י',11:'יא',12:'יב',13:'יג',14:'יד',15:'טו',16:'טז',17:'יז',18:'יח',19:'יט',20:'כ',21:'כא',22:'כב',23:'כג',24:'כד',25:'כה',26:'כו',27:'כז',28:'כח',29:'כט',30:'ל'}; return map[n] || n; };
             const monthHebrewDisplay = { "Nisan": "ניסן", "Iyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול", "Tishrei": "תשרי", "Cheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", "Sh'vat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'" };
@@ -570,13 +538,13 @@
                     findCells(/\{\{Name of the deceased\}\}/i).forEach(item => { newData[item.key] = deceasedName; newStyles[item.key] = stylesMap.name; });
 
                     let dateCells = []; const monthCells = []; const cellMeta = {};
-                    pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; const val = newData[key]; cellMeta[key] = { pIdx, tY: t.y, r, c }; if (val) { const dateMatch = String(val).match(/\{\{date(\d+)\}\}/i); if (dateMatch) dateCells.push({ key, group: parseInt(dateMatch[1]), ...cellMeta[key] }); const monthMatch = String(val).match(/\{\{month(\d+)\}\}/i); if (monthMatch) monthCells.push({ key, group: parseInt(monthMatch[1]) }); } } } }); });
+                    pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; const val = newData[key]; cellMeta[key] = { pIdx, tY: t.y, r, c }; if (val) { const dMatch = String(val).match(/\{\{date(\d+)\}\}/i); if (dMatch) dateCells.push({ key, group: parseInt(dMatch[1]), ...cellMeta[key] }); const mMatch = String(val).match(/\{\{month(\d+)\}\}/i); if (mMatch) monthCells.push({ key, group: parseInt(mMatch[1]) }); } } } }); });
 
                     if (dateCells.length === 0) {
-                        const allPotentialCells = [];
-                        pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; if (!String(newData[key] || "").match(/\{\{Name|\{\{month/i)) allPotentialCells.push({ key, pIdx, tY: t.y, r, c }); } } }); });
-                        allPotentialCells.sort((a, b) => { if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx; if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY; if (a.r !== b.r) return a.r - b.r; return b.c - a.c; });
-                        dateCells = allPotentialCells.map((c, idx) => ({ ...c, group: idx + 1 }));
+                        const allPotential = [];
+                        pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; if (!String(newData[key] || "").match(/\{\{Name|\{\{month/i)) allPotential.push({ key, pIdx, tY: t.y, r, c }); } } }); });
+                        allPotential.sort((a, b) => { if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx; if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY; if (a.r !== b.r) return a.r - b.r; return b.c - a.c; });
+                        dateCells = allPotential.map((c, idx) => ({ ...c, group: idx + 1 }));
                     } else {
                         dateCells.sort((a, b) => { if (a.group !== b.group) return a.group - b.group; if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx; if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY; if (a.r !== b.r) return a.r - b.r; return b.c - a.c; });
                     }
@@ -587,25 +555,26 @@
                     let startDate, endDate;
                     const groupMonths = {}; 
 
-                    if (templateMeta.calcMethod === 'forward') {
-                        // Forward calculation: Start from selected date
+                    // Decide calc method based on template config or user choice
+                    const effectiveCalcMethod = templateMeta.calcMethodType === 'user-selectable' ? wizardCalcMode : (templateMeta.calcMethodType === 'fixed-forward' ? 'forward' : 'backward');
+
+                    if (effectiveCalcMethod === 'forward') {
                         startDate = selectedDate;
                         for (let i = 0; i < dateCells.length; i++) {
                             const cell = dateCells[i]; const dHeb = typeof gematriya === 'function' ? gematriya(runningDate.getDate()) : runningDate.getDate(); 
-                            const mName = runningDate.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; const formatted = `${dHeb} ${mHeb}`;
-                            newData[cell.key] = " " + formatted;
+                            const mHeb = monthHebrewNames[runningDate.getMonthName()] || runningDate.getMonthName();
+                            newData[cell.key] = `${dHeb} ${mHeb}`;
                             newStyles[cell.key] = stylesMap.date;
                             if (!groupMonths[cell.group]) groupMonths[cell.group] = new Set(); groupMonths[cell.group].add(mHeb);
                             if (i === dateCells.length - 1) endDate = runningDate;
                             runningDate = runningDate.next();
                         }
                     } else {
-                        // Backward calculation (Original): End on selected date
                         endDate = selectedDate;
                         for (let i = dateCells.length - 1; i >= 0; i--) {
                             const cell = dateCells[i]; const dHeb = typeof gematriya === 'function' ? gematriya(runningDate.getDate()) : runningDate.getDate(); 
-                            const mName = runningDate.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; const formatted = `${dHeb} ${mHeb}`;
-                            newData[cell.key] = " " + formatted;
+                            const mHeb = monthHebrewNames[runningDate.getMonthName()] || runningDate.getMonthName();
+                            newData[cell.key] = `${dHeb} ${mHeb}`;
                             newStyles[cell.key] = stylesMap.date;
                             if (!groupMonths[cell.group]) groupMonths[cell.group] = new Set(); groupMonths[cell.group].add(mHeb);
                             if (i === 0) startDate = runningDate;
@@ -613,8 +582,8 @@
                         }
                     }
 
-                    monthCells.forEach(item => { const months = groupMonths[item.group]; if (months && months.size > 0) { newData[item.key] = " " + Array.from(months).reverse().join(' - '); newStyles[item.key] = stylesMap.month; } else newData[item.key] = ""; });
-                    const formatFullDate = (d) => { const yHeb = typeof gematriya === 'function' ? gematriya(d.getFullYear()) : d.getFullYear(); const dHeb = typeof gematriya === 'function' ? gematriya(d.getDate()) : d.getDate(); const mName = d.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; return `${dHeb} ${mHeb} ${yHeb}`; };
+                    monthCells.forEach(item => { const months = groupMonths[item.group]; if (months && months.size > 0) { newData[item.key] = Array.from(months).reverse().join(' - '); newStyles[item.key] = stylesMap.month; } });
+                    const formatFullDate = (d) => { const yHeb = typeof gematriya === 'function' ? gematriya(d.getFullYear()) : d.getFullYear(); const dHeb = typeof gematriya === 'function' ? gematriya(d.getDate()) : d.getDate(); const mHeb = monthHebrewNames[d.getMonthName()] || d.getMonthName(); return `${dHeb} ${mHeb} ${yHeb}`; };
                     findCells(/\{\{start\}\}/i).forEach(c => { newData[c.key] = formatFullDate(startDate); newStyles[c.key] = stylesMap.meta; });
                     findCells(/\{\{end\}\}/i).forEach(c => { newData[c.key] = formatFullDate(endDate); newStyles[c.key] = stylesMap.meta; });
 
@@ -623,58 +592,56 @@
                 } catch (e) { console.error(e); alert("שגיאה ביצירת הלוח"); }
             };
 
-            const refineTablePosition = (pageIndex, tableId) => {
-                const page = pages[pageIndex]; const table = page.tables.find(t => t.id === tableId); if (!table) return;
-                const img = new Image(); img.src = page.image;
-                img.onload = () => {
-                    const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
-                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
-                    const margin = 20; const domWidth = 793.7; const domHeight = 1122.5; const scaleX = canvas.width / domWidth; const scaleY = canvas.height / domHeight;
-                    const searchX = Math.max(0, (table.x - margin) * scaleX); const searchY = Math.max(0, (table.y - margin) * scaleY);
-                    const searchW = Math.min(canvas.width - searchX, (table.w + margin * 2) * scaleX); const searchH = Math.min(canvas.height - searchY, (table.h + margin * 2) * scaleY);
-                    const sc = document.createElement('canvas'); sc.width = searchW; sc.height = searchH; sc.getContext('2d').drawImage(canvas, searchX, searchY, searchW, searchH, 0, 0, searchW, searchH);
-                    const detected = detectTablesInCanvas(sc);
-                    if (detected.length > 0) {
-                        const result = detected[0];
-                        const newX = (searchX + result.x / scaleX * scaleX) / scaleX; const newY = (searchY + result.y / scaleY * scaleY) / scaleY;
-                        setPages(prev => prev.map((p, idx) => idx !== pageIndex ? p : { ...p, tables: p.tables.map(t => t.id === tableId ? { ...t, x: newX, y: newY, w: result.w, h: result.h } : t) }));
-                    } else alert("לא זוהו קווים ברורים.");
-                };
+            // --- DRAGGING LOGIC ---
+            const startDragging = (e, pageId, tableId) => {
+                if (appMode !== 'editor') return;
+                e.preventDefault();
+                e.stopPropagation();
+                const page = pages.find(p => p.id === pageId);
+                const table = page.tables.find(t => t.id === tableId);
+                const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
+                setDragInfo({ pageId, tableId, offsetX: (e.clientX - rect.left) / previewScale, offsetY: (e.clientY - rect.top) / previewScale });
             };
 
-            const handleKeyDown = (e, tableId, row, col, maxRows, maxCols) => {
-                let nextRow = row; let nextCol = col; let handled = false;
-                switch(e.key) { case 'ArrowUp': nextRow = row - 1; handled = true; break; case 'ArrowDown': nextRow = row + 1; handled = true; break; case 'ArrowLeft': nextCol = col + 1; handled = true; break; case 'ArrowRight': nextCol = col - 1; handled = true; break; }
-                if (handled && nextRow >= 0 && nextRow < maxRows && nextCol >= 0 && nextCol < maxCols) { e.preventDefault(); const nextId = `${tableId}_${nextRow}_${nextCol}`; const el = document.getElementById(nextId); if (el) { el.focus(); setCellSelection({ tableId, startR: nextRow, startC: nextCol, endR: nextRow, endC: nextCol }); } }
+            const handleEditorMouseMove = (e) => {
+                if (dragInfo) {
+                    const pageElem = document.getElementById(`page-${dragInfo.pageId}`);
+                    if (!pageElem) return;
+                    const rect = pageElem.getBoundingClientRect();
+                    const newX = (e.clientX - rect.left) / previewScale - dragInfo.offsetX;
+                    const newY = (e.clientY - rect.top) / previewScale - dragInfo.offsetY;
+                    setPages(prev => prev.map(p => p.id !== dragInfo.pageId ? p : {
+                        ...p, tables: p.tables.map(t => t.id === dragInfo.tableId ? { ...t, x: newX, y: newY } : t)
+                    }));
+                } else if (selection) {
+                    const pageElem = document.getElementById(`page-${activePageRef.current}`);
+                    if (!pageElem) return;
+                    const rect = pageElem.getBoundingClientRect();
+                    setSelection(prev => ({ ...prev, currentX: (e.clientX - rect.left) / previewScale, currentY: (e.clientY - rect.top) / previewScale }));
+                }
             };
-            const handleCellMouseDown = (e, tableId, r, c) => { if (appMode !== 'editor') return; if (e.shiftKey && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); } else { setCellSelection({ tableId, startR: r, startC: c, endR: r, endC: c }); setIsSelectingCells(true); } };
-            const handleCellMouseEnter = (e, tableId, r, c) => { if (isFilling && cellSelection && cellSelection.tableId === tableId) { setFillTarget({ endR: r, endC: c }); } else if (isSelectingCells && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); } };
-            const handleFillHandleMouseDown = (e) => { e.stopPropagation(); e.preventDefault(); setIsFilling(true); setFillTarget({ endR: cellSelection.endR, endC: cellSelection.endC }); };
-            useEffect(() => { const h = () => { if (isSelectingCells) setIsSelectingCells(false); if (isFilling) { applyFill(); setIsFilling(false); setFillTarget(null); } }; window.addEventListener('mouseup', h); return () => window.removeEventListener('mouseup', h); }, [isSelectingCells, isFilling, fillTarget, cellSelection, data]);
-            const applyFill = () => { if (!fillTarget || !cellSelection) return; const { tableId, startR, startC, endR: selEndR, endC: selEndC } = cellSelection; const { endR: targetR, endC: targetC } = fillTarget; const r1 = Math.min(startR, selEndR); const r2 = Math.max(startR, selEndR); const c1 = Math.min(startC, selEndC); const c2 = Math.max(startC, selEndC); const tr1 = Math.min(r1, targetR); const tr2 = Math.max(r2, targetR); if (tr2 <= r2 && tr1 >= r1) return; const newData = { ...data }; for (let c = c1; c <= c2; c++) { const sourceValues = []; for(let r = r1; r <= r2; r++) sourceValues.push(data[`${tableId}_${r}_${c}`] || ""); if (targetR > r2) { const count = targetR - r2; const nextVals = generateNextValues(sourceValues, count); nextVals.forEach((val, i) => { const row = r2 + 1 + i; newData[`${tableId}_${row}_${c}`] = val; }); } } setData(newData); setCellSelection(prev => ({ ...prev, endR: Math.max(prev.endR, targetR), endC: Math.max(prev.endC, targetC) })); };
-            const generateNextValues = (sequence, count) => { const result = []; if (sequence.length === 0) return Array(count).fill(""); const isNumeric = (str) => !isNaN(parseFloat(str)) && isFinite(str); if (sequence.every(isNumeric) && sequence.length > 1) { const nums = sequence.map(parseFloat); const diff = nums[nums.length - 1] - nums[nums.length - 2]; let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; last = Math.round(last * 100) / 100; result.push(String(last)); } return result; } const regex = /^(.*?)(\d+)$/; const matches = sequence.map(s => String(s).match(regex)); if (sequence.length > 1 && matches.every(m => m)) { const prefix = matches[0][1]; if (matches.every(m => m[1] === prefix)) { const nums = matches.map(m => parseInt(m[2])); const diff = nums[nums.length - 1] - nums[nums.length - 2]; let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; result.push(`${prefix}${last}`); } return result; } } for(let i=0; i<count; i++) result.push(sequence[i % sequence.length]); return result; };
-            const detectTablesInCanvas = (canvas) => { const width = canvas.width; const height = canvas.height; const ctx = canvas.getContext('2d'); const imgData = ctx.getImageData(0, 0, width, height); const data32 = new Uint32Array(imgData.data.buffer); const isDark = (val) => (val & 0xFF) < 180 && ((val >> 8) & 0xFF) < 180 && ((val >> 16) & 0xFF) < 180; const MIN_H_LEN = width * 0.04; const MIN_V_LEN = height * 0.03; let hLines = [], vLines = []; for (let y = 0; y < height; y += 3) { let startX = -1; for (let x = 0; x < width; x++) { if (isDark(data32[y * width + x])) { if (startX === -1) startX = x; } else { if (startX !== -1) { if ((x - startX) > MIN_H_LEN) hLines.push({ y, x1: startX, x2: x }); startX = -1; } } } } for (let x = 0; x < width; x += 3) { let startY = -1; for (let y = 0; y < height; y++) { if (isDark(data32[y * width + x])) { if (startY === -1) startY = y; } else { if (startY !== -1) { if ((y - startY) > MIN_V_LEN) vLines.push({ x, y1: startY, y2: y }); startY = -1; } } } } const mergeLines = (lines, isVertical) => { if (lines.length === 0) return []; lines.sort((a, b) => isVertical ? (a.x - b.x) : (a.y - b.y)); const merged = []; let curr = lines[0]; for (let i = 1; i < lines.length; i++) { const next = lines[i]; const diff = isVertical ? (next.x - curr.x) : (next.y - curr.y); const overlapStart = Math.max(isVertical ? curr.y1 : curr.x1, isVertical ? next.y1 : next.x1); const overlapEnd = Math.min(isVertical ? curr.y2 : curr.x2, isVertical ? next.y2 : next.x2); if (diff < 5 && (overlapEnd - overlapStart) > 0) { if (isVertical) { curr.y1 = Math.min(curr.y1, next.y1); curr.y2 = Math.max(curr.y2, next.y2); } else { curr.x1 = Math.min(curr.x1, next.x1); curr.x2 = Math.max(curr.x2, next.x2); } curr.thickness = (curr.thickness || 1) + diff; } else { if ((curr.thickness || 1) < 20) merged.push(curr); curr = next; } } if ((curr.thickness || 1) < 20) merged.push(curr); return merged; }; const cleanH = mergeLines(hLines, false); const cleanV = mergeLines(vLines, true); if (cleanH.length < 2 || cleanV.length < 2) return []; const V_OFFSET = cleanH.length; const adj = new Array(cleanH.length + cleanV.length).fill(null).map(() => []); cleanH.forEach((h, hIdx) => { cleanV.forEach((v, vIdx) => { if (v.x >= h.x1 - 5 && v.x <= h.x2 + 5 && h.y >= v.y1 - 5 && h.y <= v.y2 + 5) { adj[hIdx].push(V_OFFSET + vIdx); adj[V_OFFSET + vIdx].push(hIdx); } }); }); const visited = new Array(adj.length).fill(false); const foundTables = []; for (let i = 0; i < adj.length; i++) { if (!visited[i] && adj[i].length > 0) { const cH = []; const cV = []; const q = [i]; visited[i] = true; while (q.length > 0) { const n = q.pop(); if (n < V_OFFSET) cH.push(cleanH[n]); else cV.push(cleanV[n - V_OFFSET]); for (const neighbor of adj[n]) { if (!visited[neighbor]) { visited[neighbor] = true; q.push(neighbor); } } } if (cH.length >= 2 && cV.length >= 2) foundTables.push({ h: cH, v: cV }); } } const domW = 793.7; const domH = 1122.5; const sX = domW / width; const sY = domH / height; return foundTables.map(tbl => { const minX = Math.min(...tbl.v.map(l => l.x)); const maxX = Math.max(...tbl.v.map(l => l.x)); const minY = Math.min(...tbl.h.map(l => l.y)); const maxY = Math.max(...tbl.h.map(l => l.y)); const uY = tbl.h.map(l => l.y).sort((a,b)=>a-b).filter((y, i, arr) => i===0 || y - arr[i-1] > 10); const uX = tbl.v.map(l => l.x).sort((a,b)=>a-b).filter((x, i, arr) => i===0 || x - arr[i-1] > 10); return { id: uid(), x: minX * sX, y: minY * sY, w: (maxX - minX) * sX, h: (maxY - minY) * sY, rows: Math.max(1, uY.length - 1), cols: Math.max(1, uX.length - 1) }; }); };
-            
-            const getCoords = (e, pageElem) => { const rect = pageElem.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; };
-            const handleMouseDown = (e, pageId) => { if (appMode !== 'editor' || pendingTable) return; const { x, y } = getCoords(e, e.currentTarget); activePageRef.current = pageId; setSelection({ startX: x, startY: y, currentX: x, currentY: y }); };
-            const handleMouseMove = (e) => { if (!selection) return; const { x, y } = getCoords(e, e.currentTarget); setSelection(prev => ({ ...prev, currentX: x, currentY: y })); };
-            const handleMouseUp = () => { if (!selection) return; const x = Math.min(selection.startX, selection.currentX), y = Math.min(selection.startY, selection.currentY), w = Math.abs(selection.currentX - selection.startX), h = Math.abs(selection.currentY - selection.startY); setSelection(null); if (w > 5 && h > 5 && activePageRef.current) setPendingTable({ pageId: activePageRef.current, x, y, w, h }); };
-            const confirmTable = () => { if (!pendingTable) return; setPages(prev => prev.map(p => p.id !== pendingTable.pageId ? p : { ...p, tables: [...p.tables, { id: uid(), x: pendingTable.x, y: pendingTable.y, w: pendingTable.w, h: pendingTable.h, rows: parseInt(newTableConfig.rows) || 10, cols: parseInt(newTableConfig.cols) || 4 }] })); setPendingTable(null); };
-            const deleteTable = (pageId, tableId) => { if (confirm("למחוק טבלה?")) setPages(prev => prev.map(p => p.id !== pageId ? p : { ...p, tables: p.tables.filter(t => t.id !== tableId) })); };
-            const deletePage = (pageId) => { if (confirm("מחק עמוד?")) setPages(prev => prev.filter(p => p.id !== pageId)); };
-            const handleInputChange = (tableId, row, col, val) => { setData(prev => ({ ...prev, [`${tableId}_${row}_${col}`]: val })); };
-            
+
+            const handleEditorMouseUp = () => {
+                if (dragInfo) setDragInfo(null);
+                if (selection) {
+                    const x = Math.min(selection.startX, selection.currentX), y = Math.min(selection.startY, selection.currentY), w = Math.abs(selection.currentX - selection.startX), h = Math.abs(selection.currentY - selection.startY);
+                    setSelection(null);
+                    if (w > 10 && h > 10) setPendingTable({ pageId: activePageRef.current, x, y, w, h });
+                }
+            };
+
+            // --- MISC UTILS ---
             const saveTemplate = () => { const template = { version: 2, pages, data, styles: cellStyles, meta: templateMeta }; const blob = new Blob([JSON.stringify(template)], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "template.json"; a.click(); };
-            const handlePdfUpload = async (e) => { const file = e.target.files[0]; if (!file) return; setIsProcessing(true); setProcessingMsg("טוען עמודים..."); try { const buf = await file.arrayBuffer(); const pdf = await pdfjsLib.getDocument(buf).promise; const newPages = []; const maxPages = Math.min(pdf.numPages, 20); for (let i = 1; i <= maxPages; i++) { const page = await pdf.getPage(i); const vp = page.getViewport({ scale: 2.0 }); const cvs = document.createElement('canvas'); cvs.width = vp.width; cvs.height = vp.height; await page.render({ canvasContext: cvs.getContext('2d'), viewport: vp }).promise; newPages.push({ id: uid(), pageNumber: i, image: cvs.toDataURL('image/jpeg', 0.8), tables: [] }); } setPages(newPages); setData({}); setCellStyles({}); setAppMode('editor'); } catch(err) { alert("שגיאה בטעינה"); } finally { setIsProcessing(false); } };
+            const deleteTable = (pageId, tableId) => { if (confirm("למחוק טבלה?")) setPages(prev => prev.map(p => p.id !== pageId ? p : { ...p, tables: p.tables.filter(t => t.id !== tableId) })); };
+            const confirmTable = () => { if (!pendingTable) return; setPages(prev => prev.map(p => p.id !== pendingTable.pageId ? p : { ...p, tables: [...p.tables, { id: uid(), x: pendingTable.x, y: pendingTable.y, w: pendingTable.w, h: pendingTable.h, rows: parseInt(newTableConfig.rows) || 30, cols: parseInt(newTableConfig.cols) || 4 }] })); setPendingTable(null); };
 
-            // --- RENDER ---
-            
-            if (appMode === 'initial-loading') return <div className="loader-container"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-600"></div></div>;
+            // --- RENDERING ---
+            if (appMode === 'initial-loading') return <div className="loader-container"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-800"></div></div>;
 
             if (appMode === 'lock-screen') {
                 return (
                     <div className="hero-overlay">
-                        <div className="glass-card fade-in max-w-sm">
+                        <div className="glass-card">
                             <Icon name="Lock" size={48} className="mx-auto text-slate-400 mb-6" />
                             <h2 className="text-xl font-bold mb-4">גישת עריכה מוגנת</h2>
                             <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()} placeholder="סיסמה..." className="fancy-input mb-4 text-center" />
@@ -684,39 +651,43 @@
                 );
             }
 
-            if (appMode === 'no-template') {
-                 return (
-                    <div className="loader-container">
-                        <Icon name="FileX" size={64} className="text-slate-300 mb-4" />
-                        <h2 className="text-2xl font-bold mb-2">לא נמצאה תבנית</h2>
-                        <p className="text-slate-500 text-lg text-center">קובץ תבנית הנתונים 'info.json' לא נמצא.<br/>אנא וודא שהקובץ קיים בשרת.</p>
-                    </div>
-                );
-            }
-
             if (appMode === 'wizard') {
                 return (
                     <div className="hero-overlay">
                         <div className="glass-card fade-in">
-                            <div className="flex justify-center mb-6 text-yellow-600"><Icon name="Scroll" size={48} /></div>
-                            <h1 className="text-3xl font-bold title-serif mb-2">{templateMeta.wizardTitles.main}</h1>
-                            <p className="text-slate-500 mb-8">הזן פרטים ליצירה אוטומטית</p>
-                            <div className="space-y-6">
+                            <img src="https://mishnayothalperin.co.il/wp-content/uploads/2021/01/logo.png" alt="דף היומי במשניות" className="logo-img mx-auto" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block'; }} />
+                            <div style={{display:'none'}} className="title-serif text-3xl font-bold mb-4">{templateMeta.wizardTitles.main}</div>
+                            
+                            <h1 className="text-2xl font-bold title-serif mb-6">{templateMeta.wizardTitles.main}</h1>
+                            <div className="space-y-5">
                                 <div className="input-wrapper">
                                     <label className="input-label">{templateMeta.wizardTitles.dateLabel}</label>
-                                    <div className="flex gap-3 flex-col sm:flex-row">
+                                    <div className="flex gap-2 flex-col sm:flex-row">
                                         <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
                                         <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">{availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}</select>
                                         <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">{years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}</select>
                                     </div>
                                 </div>
-                                {templateMeta.showNameField && (
+
+                                {templateMeta.calcMethodType === 'user-selectable' && (
                                     <div className="input-wrapper">
-                                        <label className="input-label">הקדשה / שם המנוח</label>
-                                        <input type="text" className="fancy-input" placeholder="למשל: יוסף בן דוד ז״ל" value={deceasedName} onChange={e => setDeceasedName(e.target.value)} />
+                                        <label className="input-label">חישוב לוח לימוד</label>
+                                        <div className="calc-toggle">
+                                            <div className={`calc-option ${wizardCalcMode === 'forward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</div>
+                                            <div className={`calc-option ${wizardCalcMode === 'backward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</div>
+                                        </div>
                                     </div>
                                 )}
-                                <button onClick={handleWizardSubmit} className="generate-btn w-full justify-center mt-4"><Icon name="Sparkles" /> צור לוח לימוד</button>
+
+                                {templateMeta.showNameField && (
+                                    <div className="input-wrapper">
+                                        <label className="input-label">{templateMeta.nameLabel}</label>
+                                        <input type="text" className="fancy-input" placeholder={templateMeta.namePlaceholder} value={deceasedName} onChange={e => setDeceasedName(e.target.value)} />
+                                    </div>
+                                )}
+                                
+                                <button onClick={handleWizardSubmit} className="generate-btn w-full justify-center mt-4">צור לוח לימוד</button>
+                                <p className="text-xs text-slate-400 mt-4">© כל הזכויות שמורות למיזם דף היומי במשניות</p>
                             </div>
                         </div>
                     </div>
@@ -728,50 +699,47 @@
                     {appMode === 'editor' && (
                         <div className="toolbar">
                             <div className="flex items-center gap-4">
-                                <button onClick={() => setAppMode('wizard')} className="btn btn-outline btn-sm"><Icon name="ArrowRight" size={14} /> חזרה לוויזארד</button>
-                                <div className="h-6 w-px bg-slate-200"></div>
-                                <h1 className="text-lg font-bold text-slate-700">עורך תבנית</h1>
+                                <button onClick={() => setAppMode('wizard')} className="btn btn-secondary btn-sm"><Icon name="ArrowRight" size={14} /> חזרה</button>
+                                <h1 className="text-lg font-bold">עורך תבנית - דף היומי במשניות</h1>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button onClick={() => setShowSettings(!showSettings)} className="btn btn-outline btn-sm"><Icon name="Settings" size={14} /> הגדרות</button>
+                                <button onClick={() => setShowSettings(true)} className="btn btn-secondary btn-sm"><Icon name="Settings" size={14} /> הגדרות</button>
                                 <label className="btn btn-secondary btn-sm">
                                     <Icon name="ImagePlus" size={14} /> החלף PDF
                                     <input type="file" accept="application/pdf" onChange={handleBackgroundReplace} className="hidden" />
                                 </label>
-                                <button onClick={saveTemplate} className="btn btn-primary btn-sm"><Icon name="Save" size={14} /> שמור תבנית</button>
+                                <button onClick={saveTemplate} className="btn btn-primary btn-sm">שמור תבנית</button>
                             </div>
                         </div>
                     )}
 
-                    <div className="workspace">
-                        {isProcessing && <div className="fixed inset-0 bg-white/80 z-[999] flex items-center justify-center flex-col"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div><span className="font-bold text-lg text-emerald-800">{processingMsg}</span></div>}
-                        {pages.map((page, index) => (
+                    <div className="workspace" onMouseMove={handleEditorMouseMove} onMouseUp={handleEditorMouseUp}>
+                        {isProcessing && <div className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center flex-col text-white"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-gold mb-4"></div><span className="font-bold">{processingMsg}</span></div>}
+                        {pages.map((page, pIdx) => (
                             <div key={page.id} className="page-wrapper" style={{ transform: `scale(${previewScale})`, transformOrigin: 'top center', marginBottom: `calc(${297 * previewScale}mm - 297mm + 20px)` }}>
-                                <div className="page-container" onMouseDown={(e) => handleMouseDown(e, page.id)} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
-                                    <img src={page.image} className="pdf-bg-img" alt={`Page ${index+1}`} />
+                                <div id={`page-${page.id}`} className="page-container" onMouseDown={(e) => { if(appMode === 'editor' && !dragInfo) { activePageRef.current = page.id; const rect = e.currentTarget.getBoundingClientRect(); setSelection({ startX: (e.clientX - rect.left) / previewScale, startY: (e.clientY - rect.top) / previewScale, currentX: (e.clientX - rect.left) / previewScale, currentY: (e.clientY - rect.top) / previewScale }); } }}>
+                                    <img src={page.image} className="pdf-bg-img" alt={`Page ${pIdx+1}`} />
                                     <div className={`interaction-layer ${appMode === 'editor' ? 'edit-mode' : 'view-mode'}`}>
-                                        {appMode === 'editor' && <button className="delete-page-btn" onClick={() => deletePage(page.id)}><Icon name="Trash" size={16} /></button>}
                                         {page.tables.map(t => {
                                             const cW = t.w / t.cols, cH = t.h / t.rows;
-                                            const cells = [];
-                                            for(let r=0; r<t.rows; r++) {
-                                                for(let c=0; c<t.cols; c++) {
-                                                    const cellId = `${t.id}_${r}_${c}`, isSelected = cellSelection && cellSelection.tableId === t.id && r >= Math.min(cellSelection.startR, cellSelection.endR) && r <= Math.max(cellSelection.startR, cellSelection.endR) && c >= Math.min(cellSelection.startC, cellSelection.endC) && c <= Math.max(cellSelection.startC, cellSelection.endC);
-                                                    cells.push(<input key={cellId} id={cellId} className={`cell-input ${isSelected ? 'bg-blue-50' : ''}`} style={{ right: `${c * cW}px`, top: `${r * cH}px`, width: `${cW}px`, height: `${cH}px`, ...(cellStyles[cellId] || {}), pointerEvents: appMode === 'preview' ? 'none' : 'auto' }} readOnly={appMode === 'preview'} value={data[cellId] || ""} onChange={(e) => handleInputChange(t.id, r, c, e.target.value)} onKeyDown={(e) => handleKeyDown(e, t.id, r, c, t.rows, t.cols)} onMouseDown={(e) => handleCellMouseDown(e, t.id, r, c)} onMouseEnter={(e) => handleCellMouseEnter(e, t.id, r, c)} autoComplete="off" />);
-                                                }
-                                            }
                                             return (
-                                                <div key={t.id} className="grid-container" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` }}>
+                                                <div key={t.id} className="grid-container" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px`, cursor: appMode === 'editor' ? 'default' : 'text' }}>
                                                     {appMode === 'editor' && (
                                                         <div className="action-btn-group">
-                                                            <div className="mini-btn bg-purple" onClick={() => refineTablePosition(index, t.id)}><Icon name="Wand2" size={14} /></div>
+                                                            <div className="mini-btn bg-emerald" onMouseDown={(e) => startDragging(e, page.id, t.id)} title="הזז טבלה"><Icon name="Move" size={14} /></div>
                                                             <div className="mini-btn bg-red" onClick={() => deleteTable(page.id, t.id)}><Icon name="Trash2" size={14} /></div>
                                                         </div>
                                                     )}
-                                                    {cells}
+                                                    {Array.from({length: t.rows}).map((_, r) => Array.from({length: t.cols}).map((_, c) => {
+                                                        const id = `${t.id}_${r}_${c}`;
+                                                        return <input key={id} className="cell-input" style={{ right: `${c * cW}px`, top: `${r * cH}px`, width: `${cW}px`, height: `${cH}px`, ...(cellStyles[id] || {}), pointerEvents: appMode === 'preview' ? 'none' : 'auto' }} readOnly={appMode === 'preview'} value={data[id] || ""} onChange={(e) => setData({...data, [id]: e.target.value})} autoComplete="off" />;
+                                                    }))}
                                                 </div>
                                             );
                                         })}
+                                        {selection && activePageRef.current === page.id && (
+                                            <div className="selection-overlay" style={{ left: Math.min(selection.startX, selection.currentX), top: Math.min(selection.startY, selection.currentY), width: Math.abs(selection.currentX - selection.startX), height: Math.abs(selection.currentY - selection.startY) }} />
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -782,48 +750,64 @@
                         <div className="floating-toolbar">
                             <button onClick={() => window.print()} className="btn btn-primary"><Icon name="Printer" /> הדפס / שמור כ-PDF</button>
                             <div className="w-px bg-slate-200 mx-1"></div>
-                            <button onClick={() => window.location.reload()} className="btn btn-outline"><Icon name="RotateCcw" /> חזרה לעריכה</button>
+                            <button onClick={() => setAppMode('wizard')} className="btn btn-outline"><Icon name="RotateCcw" /> חזרה לוויזארד</button>
                         </div>
                     )}
 
                     {showSettings && (
-                        <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
-                            <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
-                                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icon name="Settings" /> הגדרות תבנית</h2>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="input-label">שיטת חישוב תאריכים</label>
-                                        <select className="fancy-input" value={templateMeta.calcMethod} onChange={e => setTemplateMeta({...templateMeta, calcMethod: e.target.value})}>
-                                            <option value="backward">חישוב לאחור (לפי סיום)</option>
-                                            <option value="forward">חישוב קדימה (לפי התחלה)</option>
-                                        </select>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <input type="checkbox" id="show-name" checked={templateMeta.showNameField} onChange={e => setTemplateMeta({...templateMeta, showNameField: e.target.checked})} className="w-5 h-5" />
-                                        <label htmlFor="show-name" className="font-semibold">הצג שדה שם מנוח בוויזארד</label>
-                                    </div>
-                                    <div>
-                                        <label className="input-label">כותרת ראשית (Wizard)</label>
-                                        <input type="text" className="fancy-input" value={templateMeta.wizardTitles.main} onChange={e => setTemplateMeta({...templateMeta, wizardTitles: {...templateMeta.wizardTitles, main: e.target.value}})} />
-                                    </div>
-                                    <div>
-                                        <label className="input-label">תווית תאריך (Wizard)</label>
-                                        <input type="text" className="fancy-input" value={templateMeta.wizardTitles.dateLabel} onChange={e => setTemplateMeta({...templateMeta, wizardTitles: {...templateMeta.wizardTitles, dateLabel: e.target.value}})} />
+                        <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl border-t-8 border-primary-green">
+                                <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-primary-green"><Icon name="Settings" /> הגדרות תבנית וטקסטים</h2>
+                                <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label className="input-label">סוג חישוב תאריכים</label>
+                                            <select className="fancy-input" value={templateMeta.calcMethodType} onChange={e => setTemplateMeta({...templateMeta, calcMethodType: e.target.value})}>
+                                                <option value="fixed-backward">קבוע: חישוב לאחור (לפי סיום)</option>
+                                                <option value="fixed-forward">קבוע: חישוב קדימה (לפי התחלה)</option>
+                                                <option value="user-selectable">בחירת משתמש בוויזארד</option>
+                                            </select>
+                                        </div>
+                                        <div className="h-px bg-slate-100 my-2"></div>
+                                        <div>
+                                            <label className="input-label">כותרת ראשית (Wizard)</label>
+                                            <input type="text" className="fancy-input" value={templateMeta.wizardTitles.main} onChange={e => setTemplateMeta({...templateMeta, wizardTitles: {...templateMeta.wizardTitles, main: e.target.value}})} />
+                                        </div>
+                                        <div>
+                                            <label className="input-label">תווית תאריך (Wizard)</label>
+                                            <input type="text" className="fancy-input" value={templateMeta.wizardTitles.dateLabel} onChange={e => setTemplateMeta({...templateMeta, wizardTitles: {...templateMeta.wizardTitles, dateLabel: e.target.value}})} />
+                                        </div>
+                                        <div>
+                                            <label className="input-label">תווית שדה שם (Wizard)</label>
+                                            <input type="text" className="fancy-input" value={templateMeta.nameLabel} onChange={e => setTemplateMeta({...templateMeta, nameLabel: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="input-label">טקסט רמז בשדה שם</label>
+                                            <input type="text" className="fancy-input" value={templateMeta.namePlaceholder} onChange={e => setTemplateMeta({...templateMeta, namePlaceholder: e.target.value})} />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input type="checkbox" id="show-name" checked={templateMeta.showNameField} onChange={e => setTemplateMeta({...templateMeta, showNameField: e.target.checked})} className="w-5 h-5 accent-emerald-800" />
+                                            <label htmlFor="show-name" className="font-bold text-primary-green">הצג שדה שם בוויזארד</label>
+                                        </div>
                                     </div>
                                 </div>
-                                <button onClick={() => setShowSettings(false)} className="btn btn-primary w-full mt-6 justify-center">אישור</button>
+                                <div className="flex gap-2 mt-8">
+                                    <button onClick={() => setShowSettings(false)} className="btn btn-primary flex-1 justify-center">אישור ושמירה</button>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {pendingTable && (
-                        <div className="popover" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1000 }}>
-                            <h3 className="font-bold text-sm mb-2 text-slate-700">הגדרת טבלה</h3>
-                            <div className="grid grid-cols-2 gap-2 mb-3">
-                                <div><label className="text-xs text-slate-500 block mb-1">שורות</label><input type="number" className="w-full border rounded px-2 py-1 text-sm" value={newTableConfig.rows} onChange={e => setNewTableConfig({...newTableConfig, rows: e.target.value})} /></div>
-                                <div><label className="text-xs text-slate-500 block mb-1">עמודות</label><input type="number" className="w-full border rounded px-2 py-1 text-sm" value={newTableConfig.cols} onChange={e => setNewTableConfig({...newTableConfig, cols: e.target.value})} /></div>
+                        <div className="fixed inset-0 bg-black/40 z-[1000] flex items-center justify-center">
+                            <div className="bg-white p-6 rounded-2xl shadow-xl w-64 text-center border-t-8 border-blue-500">
+                                <h3 className="font-bold mb-4 text-slate-700">הגדרת טבלה חדשה</h3>
+                                <div className="space-y-3 mb-6">
+                                    <div><label className="text-xs font-bold block mb-1">מספר שורות</label><input type="number" className="fancy-input text-center" value={newTableConfig.rows} onChange={e => setNewTableConfig({...newTableConfig, rows: e.target.value})} /></div>
+                                    <div><label className="text-xs font-bold block mb-1">מספר עמודות</label><input type="number" className="fancy-input text-center" value={newTableConfig.cols} onChange={e => setNewTableConfig({...newTableConfig, cols: e.target.value})} /></div>
+                                </div>
+                                <div className="flex gap-2"><button onClick={confirmTable} className="btn btn-primary flex-1 justify-center py-2">צור</button><button onClick={() => setPendingTable(null)} className="btn btn-outline flex-1 justify-center">ביטול</button></div>
                             </div>
-                            <div className="flex gap-2"><button onClick={confirmTable} className="btn btn-primary text-xs w-full justify-center">צור</button><button onClick={() => setPendingTable(null)} className="btn btn-outline text-xs">ביטול</button></div>
                         </div>
                     )}
                 </div>
