@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>דף היומי במשניות</title>
+    <title>מחולל לוחות לימוד מתקדם</title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -382,10 +382,7 @@
         const { useState, useEffect, useRef, useMemo } = React;
         const { HDate, gematriya } = window.hebcal;
         
-        // --- 1. הדבק את התוכן של ה-JSON כאן במקום null ---
-        // דוגמה: const EMBEDDED_TEMPLATE = { version: 2, pages: [...] };
         const EMBEDDED_TEMPLATE = null; 
-        
         const uid = () => Math.random().toString(36).substr(2, 9);
 
         // --- ICONS RENDER HELPER ---
@@ -405,30 +402,29 @@
 
         const App = () => {
             const [pages, setPages] = useState([]);
-            
-            // --- APP MODES: 'wizard' | 'preview' | 'editor' ---
             const [appMode, setAppMode] = useState('initial-loading');
-            
             const [isProcessing, setIsProcessing] = useState(false);
             const [processingMsg, setProcessingMsg] = useState("");
-            
             const [data, setData] = useState({});
             const [cellStyles, setCellStyles] = useState({});
-            
-            // Dynamic scale for preview mode on mobile
             const [previewScale, setPreviewScale] = useState(1);
-
             const [showBorders, setShowBorders] = useState(false); 
-
-            // Canvas creation selection
             const [selection, setSelection] = useState(null);
             const [pendingTable, setPendingTable] = useState(null);
-            
-            // Cell selection & Fill Handle
             const [cellSelection, setCellSelection] = useState(null);
             const [isSelectingCells, setIsSelectingCells] = useState(false);
             const [isFilling, setIsFilling] = useState(false);
             const [fillTarget, setFillTarget] = useState(null);
+            const [showSettings, setShowSettings] = useState(false);
+
+            // New States for Password and Routing
+            const [password, setPassword] = useState("");
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [templateMeta, setTemplateMeta] = useState({ 
+                calcMethod: 'backward', // 'backward' or 'forward'
+                wizardTitles: { main: "מחולל לוחות לימוד", dateLabel: "תאריך סיום (יעד)" },
+                showNameField: true
+            });
 
             const activePageRef = useRef(null);
             const [newTableConfig, setNewTableConfig] = useState({ rows: 30, cols: 4 });
@@ -440,46 +436,68 @@
             const [selectedMonth, setSelectedMonth] = useState(today.getMonthName());
             const [selectedDay, setSelectedDay] = useState(today.getDate());
 
-            // --- AUTO LOAD LOGIC ---
+            // --- AUTO LOAD LOGIC & ROUTING ---
             useEffect(() => {
+                const urlParams = new URLSearchParams(window.location.search);
+                const templateId = urlParams.get('t');
+                const mode = urlParams.get('mode');
+
                 const tryLoadTemplate = async () => {
+                    const filename = templateId ? `template_${templateId}.json` : 'info.json';
+                    
                     if (EMBEDDED_TEMPLATE) {
                         try {
                             const json = typeof EMBEDDED_TEMPLATE === 'string' ? JSON.parse(EMBEDDED_TEMPLATE) : EMBEDDED_TEMPLATE;
                             loadJson(json);
-                            setAppMode('wizard');
+                            proceed();
                             return; 
                         } catch(e) {}
                     }
                     try {
-                        const response = await fetch('info.json');
+                        const response = await fetch(filename);
                         if (!response.ok) throw new Error("Template not found");
                         const json = await response.json();
                         loadJson(json);
-                        setAppMode('wizard');
+                        proceed();
                     } catch (err) {
                         setAppMode('no-template');
                     }
                 };
+
+                const proceed = () => {
+                    if (mode === 'edit' && !isAuthenticated) {
+                        setAppMode('lock-screen');
+                    } else if (mode === 'edit' && isAuthenticated) {
+                        setAppMode('editor');
+                    } else {
+                        setAppMode('wizard');
+                    }
+                };
+
                 tryLoadTemplate();
-            }, []);
+            }, [isAuthenticated]);
+
+            const handlePasswordSubmit = () => {
+                if (password === "2210") {
+                    setIsAuthenticated(true);
+                } else {
+                    alert("סיסמה שגויה");
+                }
+            };
             
-            // --- SCALE LISTENER FOR MOBILE ---
+            // --- SCALE LISTENER ---
             useEffect(() => {
                 const handleResize = () => {
                     const width = window.innerWidth;
-                    // Standard A4 width is approx 794px. If screen is smaller, scale down.
-                    // We leave some margin (e.g. 20px).
                     if (width < 800) {
-                        const scale = (width - 16) / 794; // 16px safety margin
+                        const scale = (width - 16) / 794;
                         setPreviewScale(scale);
                     } else {
                         setPreviewScale(1);
                     }
                 };
-                
                 window.addEventListener('resize', handleResize);
-                handleResize(); // Initial check
+                handleResize();
                 return () => window.removeEventListener('resize', handleResize);
             }, []);
 
@@ -488,6 +506,11 @@
                     setPages(json.pages); 
                     setData(json.data || {}); 
                     setCellStyles(json.styles || {});
+                    if (json.meta) setTemplateMeta(prev => ({ ...prev, ...json.meta }));
+                    
+                    // Auto-detect name field if not explicitly in meta
+                    const hasNameTag = Object.values(json.data || {}).some(v => String(v).match(/\{\{Name/i));
+                    setTemplateMeta(prev => ({ ...prev, showNameField: hasNameTag }));
                 } 
                 else if (json.bgImage && json.tables) { 
                     setPages([{ id: uid(), pageNumber: 1, image: json.bgImage, tables: json.tables }]); 
@@ -496,18 +519,27 @@
                 } 
             };
 
-            const handleManualUpload = (e) => {
+            const handleBackgroundReplace = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    try {
-                        const json = JSON.parse(ev.target.result);
-                        loadJson(json);
-                        setAppMode('wizard');
-                    } catch(err) { alert("קובץ לא תקין"); }
-                };
-                reader.readAsText(file);
+                setIsProcessing(true); setProcessingMsg("מחליף רקעים...");
+                try {
+                    const buf = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument(buf).promise;
+                    const newImages = [];
+                    const count = Math.min(pdf.numPages, pages.length);
+                    for (let i = 1; i <= count; i++) {
+                        const page = await pdf.getPage(i);
+                        const viewport = page.getViewport({ scale: 2.0 });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = viewport.width; canvas.height = viewport.height;
+                        const ctx = canvas.getContext('2d');
+                        await page.render({ canvasContext: ctx, viewport }).promise;
+                        newImages.push(canvas.toDataURL('image/jpeg', 0.8));
+                    }
+                    setPages(prev => prev.map((p, idx) => newImages[idx] ? { ...p, image: newImages[idx] } : p));
+                    alert("הרקעים הוחלפו בהצלחה!");
+                } catch(err) { alert("שגיאה בטעינת ה-PDF"); } finally { setIsProcessing(false); }
             };
 
             // --- WIZARD LOGIC (DATE HELPERS) ---
@@ -521,23 +553,20 @@
 
             const handleWizardSubmit = () => {
                  try {
-                    const endDate = new HDate(parseInt(selectedDay), selectedMonth, parseInt(selectedYear));
+                    const selectedDate = new HDate(parseInt(selectedDay), selectedMonth, parseInt(selectedYear));
                     const newData = { ...data };
                     const newStyles = { ...cellStyles };
                     
-                    // UPDATED STYLES CONFIGURATION
                     const stylesMap = { 
                         name: { fontSize: '13px', fontWeight: '800', textAlign: 'center' }, 
-                        month: { fontSize: '8.5px', fontWeight: '700', textAlign: 'right' }, 
+                        month: { fontSize: '9px', fontWeight: '700', textAlign: 'right' }, 
                         meta: { fontSize: '11px', fontWeight: '700', textAlign: 'center' },
                         date: { fontSize: '7.5px', fontWeight: '700', textAlign: 'right' }
                     };
                     
                     const monthHebrewNames = { "Nisan": "ניסן", "Iyar": "אייר", "Iyyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול", "Tishrei": "תשרי", "Cheshvan": "חשוון", "MarCheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", "Sh'vat": "שבט", "Shvat": "שבט", "Shevat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'" };
-
                     const findCells = (pattern) => { const matches = []; Object.entries(newData).forEach(([key, val]) => { if (String(val).match(pattern)) matches.push({ key, val }); }); return matches; };
                     
-                    // 1. Fill Name (Centered, 13px)
                     findCells(/\{\{Name of the deceased\}\}/i).forEach(item => { newData[item.key] = deceasedName; newStyles[item.key] = stylesMap.name; });
 
                     let dateCells = []; const monthCells = []; const cellMeta = {};
@@ -553,123 +582,66 @@
                     }
 
                     if (dateCells.length === 0) { alert("לא נמצאו טבלאות למילוי."); return; }
-                    let runningDate = endDate; let startDate = null; const groupMonths = {}; 
 
-                    for (let i = dateCells.length - 1; i >= 0; i--) {
-                        const cell = dateCells[i]; const dHeb = typeof gematriya === 'function' ? gematriya(runningDate.getDate()) : runningDate.getDate(); 
-                        const mName = runningDate.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; const formatted = `${dHeb} ${mHeb}`;
-                        
-                        // 2. Fill Dates (Right align, 10px, space prefix)
-                        newData[cell.key] = " " + formatted;
-                        newStyles[cell.key] = stylesMap.date;
+                    let runningDate = selectedDate; 
+                    let startDate, endDate;
+                    const groupMonths = {}; 
 
-                        if (!groupMonths[cell.group]) groupMonths[cell.group] = new Set(); groupMonths[cell.group].add(mHeb);
-                        if (i === 0) startDate = runningDate;
-                        runningDate = runningDate.prev();
+                    if (templateMeta.calcMethod === 'forward') {
+                        // Forward calculation: Start from selected date
+                        startDate = selectedDate;
+                        for (let i = 0; i < dateCells.length; i++) {
+                            const cell = dateCells[i]; const dHeb = typeof gematriya === 'function' ? gematriya(runningDate.getDate()) : runningDate.getDate(); 
+                            const mName = runningDate.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; const formatted = `${dHeb} ${mHeb}`;
+                            newData[cell.key] = " " + formatted;
+                            newStyles[cell.key] = stylesMap.date;
+                            if (!groupMonths[cell.group]) groupMonths[cell.group] = new Set(); groupMonths[cell.group].add(mHeb);
+                            if (i === dateCells.length - 1) endDate = runningDate;
+                            runningDate = runningDate.next();
+                        }
+                    } else {
+                        // Backward calculation (Original): End on selected date
+                        endDate = selectedDate;
+                        for (let i = dateCells.length - 1; i >= 0; i--) {
+                            const cell = dateCells[i]; const dHeb = typeof gematriya === 'function' ? gematriya(runningDate.getDate()) : runningDate.getDate(); 
+                            const mName = runningDate.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; const formatted = `${dHeb} ${mHeb}`;
+                            newData[cell.key] = " " + formatted;
+                            newStyles[cell.key] = stylesMap.date;
+                            if (!groupMonths[cell.group]) groupMonths[cell.group] = new Set(); groupMonths[cell.group].add(mHeb);
+                            if (i === 0) startDate = runningDate;
+                            runningDate = runningDate.prev();
+                        }
                     }
 
-                    // 3. Fill Months (Right align, 9px, space prefix added here)
                     monthCells.forEach(item => { const months = groupMonths[item.group]; if (months && months.size > 0) { newData[item.key] = " " + Array.from(months).reverse().join(' - '); newStyles[item.key] = stylesMap.month; } else newData[item.key] = ""; });
-                    
                     const formatFullDate = (d) => { const yHeb = typeof gematriya === 'function' ? gematriya(d.getFullYear()) : d.getFullYear(); const dHeb = typeof gematriya === 'function' ? gematriya(d.getDate()) : d.getDate(); const mName = d.getMonthName(); const mHeb = monthHebrewNames[mName] || mName; return `${dHeb} ${mHeb} ${yHeb}`; };
-                    
-                    // 4. Fill Meta/Start/End (Centered, 11px)
                     findCells(/\{\{start\}\}/i).forEach(c => { newData[c.key] = formatFullDate(startDate); newStyles[c.key] = stylesMap.meta; });
                     findCells(/\{\{end\}\}/i).forEach(c => { newData[c.key] = formatFullDate(endDate); newStyles[c.key] = stylesMap.meta; });
 
                     setData(newData); setCellStyles(newStyles);
-                    setAppMode('preview'); // Go to clean preview mode
+                    setAppMode('preview');
                 } catch (e) { console.error(e); alert("שגיאה ביצירת הלוח"); }
             };
 
-            // --- FEATURE: REPLACE BACKGROUND ---
-            const handleBackgroundReplace = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                setIsProcessing(true); setProcessingMsg("מחליף רקעים...");
-                try {
-                    const buf = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument(buf).promise;
-                    const newImages = [];
-                    const count = Math.min(pdf.numPages, pages.length); // Limit to existing page count
-                    
-                    for (let i = 1; i <= count; i++) {
-                        const page = await pdf.getPage(i);
-                        const viewport = page.getViewport({ scale: 2.0 });
-                        const canvas = document.createElement('canvas');
-                        canvas.width = viewport.width;
-                        canvas.height = viewport.height;
-                        const ctx = canvas.getContext('2d');
-                        await page.render({ canvasContext: ctx, viewport }).promise;
-                        newImages.push(canvas.toDataURL('image/jpeg', 0.8));
-                    }
-                    
-                    setPages(prev => prev.map((p, idx) => {
-                         // If we have a new image for this index, replace it. Keep tables intact.
-                         return newImages[idx] ? { ...p, image: newImages[idx] } : p;
-                    }));
-                    alert("הרקעים הוחלפו בהצלחה! הנתונים והטבלאות נשמרו.");
-                } catch(err) { alert("שגיאה בטעינת ה-PDF"); } finally { setIsProcessing(false); }
-            };
-
-            // --- FEATURE: AUTO-ALIGN TABLE (Refine) ---
             const refineTablePosition = (pageIndex, tableId) => {
-                const page = pages[pageIndex];
-                const table = page.tables.find(t => t.id === tableId);
-                if (!table) return;
-
-                // Create a canvas for the existing image
-                const img = new Image();
-                img.src = page.image;
+                const page = pages[pageIndex]; const table = page.tables.find(t => t.id === tableId); if (!table) return;
+                const img = new Image(); img.src = page.image;
                 img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width; canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
-                    
-                    // Add some margin to search around the current table
-                    const margin = 20; 
-                    const domWidth = 793.7; const domHeight = 1122.5; 
-                    const scaleX = canvas.width / domWidth; 
-                    const scaleY = canvas.height / domHeight;
-
-                    const searchX = Math.max(0, (table.x - margin) * scaleX);
-                    const searchY = Math.max(0, (table.y - margin) * scaleY);
-                    const searchW = Math.min(canvas.width - searchX, (table.w + margin * 2) * scaleX);
-                    const searchH = Math.min(canvas.height - searchY, (table.h + margin * 2) * scaleY);
-
-                    // Crop and detect in this small area
-                    const searchCanvas = document.createElement('canvas');
-                    searchCanvas.width = searchW; searchCanvas.height = searchH;
-                    searchCanvas.getContext('2d').drawImage(canvas, searchX, searchY, searchW, searchH, 0, 0, searchW, searchH);
-                    
-                    const detected = detectTablesInCanvas(searchCanvas);
+                    const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
+                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+                    const margin = 20; const domWidth = 793.7; const domHeight = 1122.5; const scaleX = canvas.width / domWidth; const scaleY = canvas.height / domHeight;
+                    const searchX = Math.max(0, (table.x - margin) * scaleX); const searchY = Math.max(0, (table.y - margin) * scaleY);
+                    const searchW = Math.min(canvas.width - searchX, (table.w + margin * 2) * scaleX); const searchH = Math.min(canvas.height - searchY, (table.h + margin * 2) * scaleY);
+                    const sc = document.createElement('canvas'); sc.width = searchW; sc.height = searchH; sc.getContext('2d').drawImage(canvas, searchX, searchY, searchW, searchH, 0, 0, searchW, searchH);
+                    const detected = detectTablesInCanvas(sc);
                     if (detected.length > 0) {
-                        // Find the one that matches best (biggest overlap) or just take the biggest result
-                        // Since we cropped around the table, the detected coordinate is relative to the crop
-                        const result = detected[0]; // Assume the biggest/first one found in crop is the right one
-                        
-                        // Convert back to page coordinates
-                        const newX = (searchX + result.x / scaleX * scaleX) / scaleX; // De-scale inside result, re-scale to page
-                        const newY = (searchY + result.y / scaleY * scaleY) / scaleY;
-                        
-                        // We need to trust the detected size, but maybe keep row/cols count?
-                        // Let's update x, y, w, h
-                        setPages(prev => prev.map((p, idx) => {
-                            if (idx !== pageIndex) return p;
-                            return {
-                                ...p,
-                                tables: p.tables.map(t => t.id === tableId ? { ...t, x: newX, y: newY, w: result.w, h: result.h } : t)
-                            };
-                        }));
-                    } else {
-                        alert("לא זוהו קווים ברורים באזור זה לתיקון המיקום.");
-                    }
+                        const result = detected[0];
+                        const newX = (searchX + result.x / scaleX * scaleX) / scaleX; const newY = (searchY + result.y / scaleY * scaleY) / scaleY;
+                        setPages(prev => prev.map((p, idx) => idx !== pageIndex ? p : { ...p, tables: p.tables.map(t => t.id === tableId ? { ...t, x: newX, y: newY, w: result.w, h: result.h } : t) }));
+                    } else alert("לא זוהו קווים ברורים.");
                 };
             };
 
-
-            // --- HELPER FUNCTIONS ---
             const handleKeyDown = (e, tableId, row, col, maxRows, maxCols) => {
                 let nextRow = row; let nextCol = col; let handled = false;
                 switch(e.key) { case 'ArrowUp': nextRow = row - 1; handled = true; break; case 'ArrowDown': nextRow = row + 1; handled = true; break; case 'ArrowLeft': nextCol = col + 1; handled = true; break; case 'ArrowRight': nextCol = col - 1; handled = true; break; }
@@ -678,27 +650,38 @@
             const handleCellMouseDown = (e, tableId, r, c) => { if (appMode !== 'editor') return; if (e.shiftKey && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); } else { setCellSelection({ tableId, startR: r, startC: c, endR: r, endC: c }); setIsSelectingCells(true); } };
             const handleCellMouseEnter = (e, tableId, r, c) => { if (isFilling && cellSelection && cellSelection.tableId === tableId) { setFillTarget({ endR: r, endC: c }); } else if (isSelectingCells && cellSelection && cellSelection.tableId === tableId) { setCellSelection(prev => ({ ...prev, endR: r, endC: c })); } };
             const handleFillHandleMouseDown = (e) => { e.stopPropagation(); e.preventDefault(); setIsFilling(true); setFillTarget({ endR: cellSelection.endR, endC: cellSelection.endC }); };
-            useEffect(() => { const handleGlobalMouseUp = () => { if (isSelectingCells) setIsSelectingCells(false); if (isFilling) { applyFill(); setIsFilling(false); setFillTarget(null); } }; window.addEventListener('mouseup', handleGlobalMouseUp); return () => window.removeEventListener('mouseup', handleGlobalMouseUp); }, [isSelectingCells, isFilling, fillTarget, cellSelection, data]);
+            useEffect(() => { const h = () => { if (isSelectingCells) setIsSelectingCells(false); if (isFilling) { applyFill(); setIsFilling(false); setFillTarget(null); } }; window.addEventListener('mouseup', h); return () => window.removeEventListener('mouseup', h); }, [isSelectingCells, isFilling, fillTarget, cellSelection, data]);
             const applyFill = () => { if (!fillTarget || !cellSelection) return; const { tableId, startR, startC, endR: selEndR, endC: selEndC } = cellSelection; const { endR: targetR, endC: targetC } = fillTarget; const r1 = Math.min(startR, selEndR); const r2 = Math.max(startR, selEndR); const c1 = Math.min(startC, selEndC); const c2 = Math.max(startC, selEndC); const tr1 = Math.min(r1, targetR); const tr2 = Math.max(r2, targetR); if (tr2 <= r2 && tr1 >= r1) return; const newData = { ...data }; for (let c = c1; c <= c2; c++) { const sourceValues = []; for(let r = r1; r <= r2; r++) sourceValues.push(data[`${tableId}_${r}_${c}`] || ""); if (targetR > r2) { const count = targetR - r2; const nextVals = generateNextValues(sourceValues, count); nextVals.forEach((val, i) => { const row = r2 + 1 + i; newData[`${tableId}_${row}_${c}`] = val; }); } } setData(newData); setCellSelection(prev => ({ ...prev, endR: Math.max(prev.endR, targetR), endC: Math.max(prev.endC, targetC) })); };
-            const generateNextValues = (sequence, count) => { const result = []; if (sequence.length === 0) return Array(count).fill(""); const isNumeric = (str) => !isNaN(parseFloat(str)) && isFinite(str); const parseNum = (str) => parseFloat(str); if (sequence.every(isNumeric) && sequence.length > 1) { const nums = sequence.map(parseNum); const diff = nums[nums.length - 1] - nums[nums.length - 2]; let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; last = Math.round(last * 100) / 100; result.push(String(last)); } return result; } const regex = /^(.*?)(\d+)$/; const matches = sequence.map(s => String(s).match(regex)); if (sequence.length > 1 && matches.every(m => m)) { const prefix = matches[0][1]; if (matches.every(m => m[1] === prefix)) { const nums = matches.map(m => parseInt(m[2])); const diff = nums[nums.length - 1] - nums[nums.length - 2]; let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; result.push(`${prefix}${last}`); } return result; } } for(let i=0; i<count; i++) result.push(sequence[i % sequence.length]); return result; };
-            const detectTablesInCanvas = (canvas) => { const width = canvas.width; const height = canvas.height; const ctx = canvas.getContext('2d'); const imgData = ctx.getImageData(0, 0, width, height); const data32 = new Uint32Array(imgData.data.buffer); const isDark = (val) => (val & 0xFF) < 180 && ((val >> 8) & 0xFF) < 180 && ((val >> 16) & 0xFF) < 180; const MIN_H_LEN = width * 0.04; const MIN_V_LEN = height * 0.03; let hLines = [], vLines = []; for (let y = 0; y < height; y += 3) { let startX = -1; for (let x = 0; x < width; x++) { if (isDark(data32[y * width + x])) { if (startX === -1) startX = x; } else { if (startX !== -1) { if ((x - startX) > MIN_H_LEN) hLines.push({ y, x1: startX, x2: x }); startX = -1; } } } } for (let x = 0; x < width; x += 3) { let startY = -1; for (let y = 0; y < height; y++) { if (isDark(data32[y * width + x])) { if (startY === -1) startY = y; } else { if (startY !== -1) { if ((y - startY) > MIN_V_LEN) vLines.push({ x, y1: startY, y2: y }); startY = -1; } } } } const mergeLines = (lines, isVertical) => { if (lines.length === 0) return []; lines.sort((a, b) => isVertical ? (a.x - b.x) : (a.y - b.y)); const merged = []; let curr = lines[0]; for (let i = 1; i < lines.length; i++) { const next = lines[i]; const diff = isVertical ? (next.x - curr.x) : (next.y - curr.y); const overlapStart = Math.max(isVertical ? curr.y1 : curr.x1, isVertical ? next.y1 : next.x1); const overlapEnd = Math.min(isVertical ? curr.y2 : curr.x2, isVertical ? next.y2 : next.x2); if (diff < 5 && (overlapEnd - overlapStart) > 0) { if (isVertical) { curr.y1 = Math.min(curr.y1, next.y1); curr.y2 = Math.max(curr.y2, next.y2); } else { curr.x1 = Math.min(curr.x1, next.x1); curr.x2 = Math.max(curr.x2, next.x2); } curr.thickness = (curr.thickness || 1) + diff; } else { if ((curr.thickness || 1) < 20) merged.push(curr); curr = next; } } if ((curr.thickness || 1) < 20) merged.push(curr); return merged; }; const cleanH = mergeLines(hLines, false); const cleanV = mergeLines(vLines, true); if (cleanH.length < 2 || cleanV.length < 2) return []; const V_OFFSET = cleanH.length; const adj = new Array(cleanH.length + cleanV.length).fill(null).map(() => []); cleanH.forEach((h, hIdx) => { cleanV.forEach((v, vIdx) => { if (v.x >= h.x1 - 5 && v.x <= h.x2 + 5 && h.y >= v.y1 - 5 && h.y <= v.y2 + 5) { adj[hIdx].push(V_OFFSET + vIdx); adj[V_OFFSET + vIdx].push(hIdx); } }); }); const visited = new Array(adj.length).fill(false); const foundTables = []; for (let i = 0; i < adj.length; i++) { if (!visited[i] && adj[i].length > 0) { const componentH = []; const componentV = []; const queue = [i]; visited[i] = true; while (queue.length > 0) { const node = queue.pop(); if (node < V_OFFSET) componentH.push(cleanH[node]); else componentV.push(cleanV[node - V_OFFSET]); for (const neighbor of adj[node]) { if (!visited[neighbor]) { visited[neighbor] = true; queue.push(neighbor); } } } if (componentH.length >= 2 && componentV.length >= 2) { foundTables.push({ h: componentH, v: componentV }); } } } const domWidth = 793.7; const domHeight = 1122.5; const scaleX = domWidth / width; const scaleY = domHeight / height; return foundTables.map(tbl => { const minX = Math.min(...tbl.v.map(l => l.x)); const maxX = Math.max(...tbl.v.map(l => l.x)); const minY = Math.min(...tbl.h.map(l => l.y)); const maxY = Math.max(...tbl.h.map(l => l.y)); const uniqueY = tbl.h.map(l => l.y).sort((a,b)=>a-b).filter((y, i, arr) => i===0 || y - arr[i-1] > 10); const uniqueX = tbl.v.map(l => l.x).sort((a,b)=>a-b).filter((x, i, arr) => i===0 || x - arr[i-1] > 10); let rows = Math.max(1, uniqueY.length - 1); let cols = Math.max(1, uniqueX.length - 1); if (rows === 0) rows = uniqueY.length; if (cols === 0) cols = uniqueX.length; return { id: uid(), x: minX * scaleX, y: minY * scaleY, w: (maxX - minX) * scaleX, h: (maxY - minY) * scaleY, rows: rows, cols: cols }; }); };
+            const generateNextValues = (sequence, count) => { const result = []; if (sequence.length === 0) return Array(count).fill(""); const isNumeric = (str) => !isNaN(parseFloat(str)) && isFinite(str); if (sequence.every(isNumeric) && sequence.length > 1) { const nums = sequence.map(parseFloat); const diff = nums[nums.length - 1] - nums[nums.length - 2]; let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; last = Math.round(last * 100) / 100; result.push(String(last)); } return result; } const regex = /^(.*?)(\d+)$/; const matches = sequence.map(s => String(s).match(regex)); if (sequence.length > 1 && matches.every(m => m)) { const prefix = matches[0][1]; if (matches.every(m => m[1] === prefix)) { const nums = matches.map(m => parseInt(m[2])); const diff = nums[nums.length - 1] - nums[nums.length - 2]; let last = nums[nums.length - 1]; for(let i=0; i<count; i++) { last += diff; result.push(`${prefix}${last}`); } return result; } } for(let i=0; i<count; i++) result.push(sequence[i % sequence.length]); return result; };
+            const detectTablesInCanvas = (canvas) => { const width = canvas.width; const height = canvas.height; const ctx = canvas.getContext('2d'); const imgData = ctx.getImageData(0, 0, width, height); const data32 = new Uint32Array(imgData.data.buffer); const isDark = (val) => (val & 0xFF) < 180 && ((val >> 8) & 0xFF) < 180 && ((val >> 16) & 0xFF) < 180; const MIN_H_LEN = width * 0.04; const MIN_V_LEN = height * 0.03; let hLines = [], vLines = []; for (let y = 0; y < height; y += 3) { let startX = -1; for (let x = 0; x < width; x++) { if (isDark(data32[y * width + x])) { if (startX === -1) startX = x; } else { if (startX !== -1) { if ((x - startX) > MIN_H_LEN) hLines.push({ y, x1: startX, x2: x }); startX = -1; } } } } for (let x = 0; x < width; x += 3) { let startY = -1; for (let y = 0; y < height; y++) { if (isDark(data32[y * width + x])) { if (startY === -1) startY = y; } else { if (startY !== -1) { if ((y - startY) > MIN_V_LEN) vLines.push({ x, y1: startY, y2: y }); startY = -1; } } } } const mergeLines = (lines, isVertical) => { if (lines.length === 0) return []; lines.sort((a, b) => isVertical ? (a.x - b.x) : (a.y - b.y)); const merged = []; let curr = lines[0]; for (let i = 1; i < lines.length; i++) { const next = lines[i]; const diff = isVertical ? (next.x - curr.x) : (next.y - curr.y); const overlapStart = Math.max(isVertical ? curr.y1 : curr.x1, isVertical ? next.y1 : next.x1); const overlapEnd = Math.min(isVertical ? curr.y2 : curr.x2, isVertical ? next.y2 : next.x2); if (diff < 5 && (overlapEnd - overlapStart) > 0) { if (isVertical) { curr.y1 = Math.min(curr.y1, next.y1); curr.y2 = Math.max(curr.y2, next.y2); } else { curr.x1 = Math.min(curr.x1, next.x1); curr.x2 = Math.max(curr.x2, next.x2); } curr.thickness = (curr.thickness || 1) + diff; } else { if ((curr.thickness || 1) < 20) merged.push(curr); curr = next; } } if ((curr.thickness || 1) < 20) merged.push(curr); return merged; }; const cleanH = mergeLines(hLines, false); const cleanV = mergeLines(vLines, true); if (cleanH.length < 2 || cleanV.length < 2) return []; const V_OFFSET = cleanH.length; const adj = new Array(cleanH.length + cleanV.length).fill(null).map(() => []); cleanH.forEach((h, hIdx) => { cleanV.forEach((v, vIdx) => { if (v.x >= h.x1 - 5 && v.x <= h.x2 + 5 && h.y >= v.y1 - 5 && h.y <= v.y2 + 5) { adj[hIdx].push(V_OFFSET + vIdx); adj[V_OFFSET + vIdx].push(hIdx); } }); }); const visited = new Array(adj.length).fill(false); const foundTables = []; for (let i = 0; i < adj.length; i++) { if (!visited[i] && adj[i].length > 0) { const cH = []; const cV = []; const q = [i]; visited[i] = true; while (q.length > 0) { const n = q.pop(); if (n < V_OFFSET) cH.push(cleanH[n]); else cV.push(cleanV[n - V_OFFSET]); for (const neighbor of adj[n]) { if (!visited[neighbor]) { visited[neighbor] = true; q.push(neighbor); } } } if (cH.length >= 2 && cV.length >= 2) foundTables.push({ h: cH, v: cV }); } } const domW = 793.7; const domH = 1122.5; const sX = domW / width; const sY = domH / height; return foundTables.map(tbl => { const minX = Math.min(...tbl.v.map(l => l.x)); const maxX = Math.max(...tbl.v.map(l => l.x)); const minY = Math.min(...tbl.h.map(l => l.y)); const maxY = Math.max(...tbl.h.map(l => l.y)); const uY = tbl.h.map(l => l.y).sort((a,b)=>a-b).filter((y, i, arr) => i===0 || y - arr[i-1] > 10); const uX = tbl.v.map(l => l.x).sort((a,b)=>a-b).filter((x, i, arr) => i===0 || x - arr[i-1] > 10); return { id: uid(), x: minX * sX, y: minY * sY, w: (maxX - minX) * sX, h: (maxY - minY) * sY, rows: Math.max(1, uY.length - 1), cols: Math.max(1, uX.length - 1) }; }); };
             
             const getCoords = (e, pageElem) => { const rect = pageElem.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; };
-            const handleMouseDown = (e, pageId) => { if (appMode !== 'editor' || pendingTable) return; const pageElem = e.currentTarget; const { x, y } = getCoords(e, pageElem); activePageRef.current = pageId; setSelection({ startX: x, startY: y, currentX: x, currentY: y }); };
-            const handleMouseMove = (e) => { if (!selection) return; const pageElem = e.currentTarget; const { x, y } = getCoords(e, pageElem); setSelection(prev => ({ ...prev, currentX: x, currentY: y })); };
-            const handleMouseUp = () => { if (!selection) return; const x = Math.min(selection.startX, selection.currentX); const y = Math.min(selection.startY, selection.currentY); const w = Math.abs(selection.currentX - selection.startX); const h = Math.abs(selection.currentY - selection.startY); setSelection(null); if (w > 5 && h > 5 && activePageRef.current) setPendingTable({ pageId: activePageRef.current, x, y, w, h }); };
-            const confirmTable = () => { if (!pendingTable) return; setPages(prevPages => prevPages.map(p => { if (p.id !== pendingTable.pageId) return p; return { ...p, tables: [...p.tables, { id: uid(), x: pendingTable.x, y: pendingTable.y, w: pendingTable.w, h: pendingTable.h, rows: parseInt(newTableConfig.rows) || 10, cols: parseInt(newTableConfig.cols) || 4 }] }; })); setPendingTable(null); };
-            const deleteTable = (pageId, tableId) => { if (confirm("למחוק טבלה זו?")) setPages(prev => prev.map(p => { if (p.id !== pageId) return p; return { ...p, tables: p.tables.filter(t => t.id !== tableId) }; })); };
-            const deletePage = (pageId) => { if (confirm("האם למחוק את כל העמוד הזה?")) setPages(prev => prev.filter(p => p.id !== pageId)); };
-            const handleInputChange = (tableId, row, col, val) => { const key = `${tableId}_${row}_${col}`; setData(prev => ({ ...prev, [key]: val })); };
+            const handleMouseDown = (e, pageId) => { if (appMode !== 'editor' || pendingTable) return; const { x, y } = getCoords(e, e.currentTarget); activePageRef.current = pageId; setSelection({ startX: x, startY: y, currentX: x, currentY: y }); };
+            const handleMouseMove = (e) => { if (!selection) return; const { x, y } = getCoords(e, e.currentTarget); setSelection(prev => ({ ...prev, currentX: x, currentY: y })); };
+            const handleMouseUp = () => { if (!selection) return; const x = Math.min(selection.startX, selection.currentX), y = Math.min(selection.startY, selection.currentY), w = Math.abs(selection.currentX - selection.startX), h = Math.abs(selection.currentY - selection.startY); setSelection(null); if (w > 5 && h > 5 && activePageRef.current) setPendingTable({ pageId: activePageRef.current, x, y, w, h }); };
+            const confirmTable = () => { if (!pendingTable) return; setPages(prev => prev.map(p => p.id !== pendingTable.pageId ? p : { ...p, tables: [...p.tables, { id: uid(), x: pendingTable.x, y: pendingTable.y, w: pendingTable.w, h: pendingTable.h, rows: parseInt(newTableConfig.rows) || 10, cols: parseInt(newTableConfig.cols) || 4 }] })); setPendingTable(null); };
+            const deleteTable = (pageId, tableId) => { if (confirm("למחוק טבלה?")) setPages(prev => prev.map(p => p.id !== pageId ? p : { ...p, tables: p.tables.filter(t => t.id !== tableId) })); };
+            const deletePage = (pageId) => { if (confirm("מחק עמוד?")) setPages(prev => prev.filter(p => p.id !== pageId)); };
+            const handleInputChange = (tableId, row, col, val) => { setData(prev => ({ ...prev, [`${tableId}_${row}_${col}`]: val })); };
             
-            const saveTemplate = () => { if (pages.length === 0) return; const template = { version: 2, pages: pages, data: data, styles: cellStyles }; const blob = new Blob([JSON.stringify(template)], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "template.json"; a.click(); };
-            const handlePdfUpload = async (e) => { const file = e.target.files[0]; if (!file) return; setIsProcessing(true); setProcessingMsg("טוען עמודים..."); try { const buf = await file.arrayBuffer(); const pdf = await pdfjsLib.getDocument(buf).promise; const newPages = []; const maxPages = Math.min(pdf.numPages, 20); for (let i = 1; i <= maxPages; i++) { setProcessingMsg(`מעבד עמוד ${i}...`); const page = await pdf.getPage(i); const viewport = page.getViewport({ scale: 2.0 }); const canvas = document.createElement('canvas'); canvas.width = viewport.width; canvas.height = viewport.height; const ctx = canvas.getContext('2d'); await page.render({ canvasContext: ctx, viewport }).promise; newPages.push({ id: uid(), pageNumber: i, image: canvas.toDataURL('image/jpeg', 0.8), tables: [] }); } setPages(newPages); setData({}); setCellStyles({}); setAppMode('editor'); } catch(err) { alert("שגיאה בטעינת הקובץ"); } finally { setIsProcessing(false); } };
+            const saveTemplate = () => { const template = { version: 2, pages, data, styles: cellStyles, meta: templateMeta }; const blob = new Blob([JSON.stringify(template)], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "template.json"; a.click(); };
+            const handlePdfUpload = async (e) => { const file = e.target.files[0]; if (!file) return; setIsProcessing(true); setProcessingMsg("טוען עמודים..."); try { const buf = await file.arrayBuffer(); const pdf = await pdfjsLib.getDocument(buf).promise; const newPages = []; const maxPages = Math.min(pdf.numPages, 20); for (let i = 1; i <= maxPages; i++) { const page = await pdf.getPage(i); const vp = page.getViewport({ scale: 2.0 }); const cvs = document.createElement('canvas'); cvs.width = vp.width; cvs.height = vp.height; await page.render({ canvasContext: cvs.getContext('2d'), viewport: vp }).promise; newPages.push({ id: uid(), pageNumber: i, image: cvs.toDataURL('image/jpeg', 0.8), tables: [] }); } setPages(newPages); setData({}); setCellStyles({}); setAppMode('editor'); } catch(err) { alert("שגיאה בטעינה"); } finally { setIsProcessing(false); } };
 
             // --- RENDER ---
             
-            if (appMode === 'initial-loading') {
-                return <div className="loader-container"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-600"></div></div>;
+            if (appMode === 'initial-loading') return <div className="loader-container"><div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-yellow-600"></div></div>;
+
+            if (appMode === 'lock-screen') {
+                return (
+                    <div className="hero-overlay">
+                        <div className="glass-card fade-in max-w-sm">
+                            <Icon name="Lock" size={48} className="mx-auto text-slate-400 mb-6" />
+                            <h2 className="text-xl font-bold mb-4">גישת עריכה מוגנת</h2>
+                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && handlePasswordSubmit()} placeholder="סיסמה..." className="fancy-input mb-4 text-center" />
+                            <button onClick={handlePasswordSubmit} className="btn btn-primary w-full justify-center py-3">התחבר</button>
+                        </div>
+                    </div>
+                );
             }
 
             if (appMode === 'no-template') {
@@ -706,7 +689,7 @@
                     <div className="loader-container">
                         <Icon name="FileX" size={64} className="text-slate-300 mb-4" />
                         <h2 className="text-2xl font-bold mb-2">לא נמצאה תבנית</h2>
-                        <p className="text-slate-500 text-lg">קובץ תבנית הנתונים 'info.json' לא נמצא.</p>
+                        <p className="text-slate-500 text-lg text-center">קובץ תבנית הנתונים 'info.json' לא נמצא.<br/>אנא וודא שהקובץ קיים בשרת.</p>
                     </div>
                 );
             }
@@ -716,120 +699,76 @@
                     <div className="hero-overlay">
                         <div className="glass-card fade-in">
                             <div className="flex justify-center mb-6 text-yellow-600"><Icon name="Scroll" size={48} /></div>
-                            <h1 className="text-3xl font-bold title-serif mb-2">מחולל לוחות לימוד</h1>
+                            <h1 className="text-3xl font-bold title-serif mb-2">{templateMeta.wizardTitles.main}</h1>
                             <p className="text-slate-500 mb-8">הזן פרטים ליצירה אוטומטית</p>
                             <div className="space-y-6">
                                 <div className="input-wrapper">
-                                    <label className="input-label">תאריך סיום (יעד)</label>
+                                    <label className="input-label">{templateMeta.wizardTitles.dateLabel}</label>
                                     <div className="flex gap-3 flex-col sm:flex-row">
                                         <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
                                         <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">{availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}</select>
                                         <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">{years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}</select>
                                     </div>
                                 </div>
-                                <div className="input-wrapper">
-                                    <label className="input-label">הקדשה / שם המנוח</label>
-                                    <input type="text" className="fancy-input" placeholder="למשל: יוסף בן דוד ז״ל" value={deceasedName} onChange={e => setDeceasedName(e.target.value)} />
-                                </div>
+                                {templateMeta.showNameField && (
+                                    <div className="input-wrapper">
+                                        <label className="input-label">הקדשה / שם המנוח</label>
+                                        <input type="text" className="fancy-input" placeholder="למשל: יוסף בן דוד ז״ל" value={deceasedName} onChange={e => setDeceasedName(e.target.value)} />
+                                    </div>
+                                )}
                                 <button onClick={handleWizardSubmit} className="generate-btn w-full justify-center mt-4"><Icon name="Sparkles" /> צור לוח לימוד</button>
-                                {/* Removed Skip to Editor Button */}
                             </div>
                         </div>
                     </div>
                 );
             }
 
-            // --- EDITOR & PREVIEW ---
             return (
                 <div className={`min-h-screen flex flex-col ${showBorders ? 'show-borders' : ''}`}>
-                    
-                    {/* Full Toolbar - Only in Editor Mode */}
                     {appMode === 'editor' && (
                         <div className="toolbar">
                             <div className="flex items-center gap-4">
-                                <button onClick={() => setAppMode('preview')} className="btn btn-outline btn-sm"><Icon name="ArrowRight" size={14} /> חזרה לתצוגה</button>
+                                <button onClick={() => setAppMode('wizard')} className="btn btn-outline btn-sm"><Icon name="ArrowRight" size={14} /> חזרה לוויזארד</button>
                                 <div className="h-6 w-px bg-slate-200"></div>
-                                <h1 className="text-lg font-bold text-slate-700">עורך מתקדם</h1>
+                                <h1 className="text-lg font-bold text-slate-700">עורך תבנית</h1>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button onClick={() => setShowBorders(!showBorders)} className={`btn btn-outline btn-icon-only ${showBorders ? 'bg-blue-50 border-blue-300' : ''}`}><Icon name="Grid" size={18} /></button>
-                                <label className="btn btn-secondary btn-sm" title="החלף את תמונות הרקע ב-PDF חדש (שומר נתונים)">
-                                    <Icon name="ImagePlus" size={14} /> החלף רקע PDF
+                                <button onClick={() => setShowSettings(!showSettings)} className="btn btn-outline btn-sm"><Icon name="Settings" size={14} /> הגדרות</button>
+                                <label className="btn btn-secondary btn-sm">
+                                    <Icon name="ImagePlus" size={14} /> החלף PDF
                                     <input type="file" accept="application/pdf" onChange={handleBackgroundReplace} className="hidden" />
                                 </label>
-                                <button onClick={saveTemplate} className="btn btn-outline btn-sm"><Icon name="Save" size={14} /> שמור תבנית</button>
-                                <button onClick={() => window.print()} className="btn btn-primary btn-sm"><Icon name="Printer" size={14} /> הדפס</button>
+                                <button onClick={saveTemplate} className="btn btn-primary btn-sm"><Icon name="Save" size={14} /> שמור תבנית</button>
                             </div>
                         </div>
                     )}
 
                     <div className="workspace">
-                        {isProcessing && (
-                            <div className="fixed inset-0 bg-white/80 z-[999] flex items-center justify-center flex-col">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
-                                <span className="font-bold text-lg text-emerald-800">{processingMsg}</span>
-                            </div>
-                        )}
-
+                        {isProcessing && <div className="fixed inset-0 bg-white/80 z-[999] flex items-center justify-center flex-col"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div><span className="font-bold text-lg text-emerald-800">{processingMsg}</span></div>}
                         {pages.map((page, index) => (
                             <div key={page.id} className="page-wrapper" style={{ transform: `scale(${previewScale})`, transformOrigin: 'top center', marginBottom: `calc(${297 * previewScale}mm - 297mm + 20px)` }}>
                                 <div className="page-container" onMouseDown={(e) => handleMouseDown(e, page.id)} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}>
                                     <img src={page.image} className="pdf-bg-img" alt={`Page ${index+1}`} />
-                                    
                                     <div className={`interaction-layer ${appMode === 'editor' ? 'edit-mode' : 'view-mode'}`}>
-                                        {appMode === 'editor' && (
-                                            <button className="delete-page-btn" onClick={() => deletePage(page.id)} title="מחק עמוד זה">
-                                                <Icon name="Trash" size={16} />
-                                            </button>
-                                        )}
-
+                                        {appMode === 'editor' && <button className="delete-page-btn" onClick={() => deletePage(page.id)}><Icon name="Trash" size={16} /></button>}
                                         {page.tables.map(t => {
-                                            const cellW = t.w / t.cols;
-                                            const cellH = t.h / t.rows;
+                                            const cW = t.w / t.cols, cH = t.h / t.rows;
                                             const cells = [];
                                             for(let r=0; r<t.rows; r++) {
                                                 for(let c=0; c<t.cols; c++) {
-                                                    const cellId = `${t.id}_${r}_${c}`;
-                                                    const isSelected = cellSelection && cellSelection.tableId === t.id && r >= Math.min(cellSelection.startR, cellSelection.endR) && r <= Math.max(cellSelection.startR, cellSelection.endR) && c >= Math.min(cellSelection.startC, cellSelection.endC) && c <= Math.max(cellSelection.startC, cellSelection.endC);
-                                                    cells.push(
-                                                        <input key={cellId} id={cellId} className={`cell-input ${isSelected ? 'bg-blue-50' : ''}`} 
-                                                            style={{ right: `${c * cellW}px`, top: `${r * cellH}px`, width: `${cellW}px`, height: `${cellH}px`, ...(cellStyles[cellId] || {}), pointerEvents: appMode === 'preview' ? 'none' : 'auto' }} 
-                                                            readOnly={appMode === 'preview'}
-                                                            value={data[cellId] || ""} onChange={(e) => handleInputChange(t.id, r, c, e.target.value)} 
-                                                            onKeyDown={(e) => handleKeyDown(e, t.id, r, c, t.rows, t.cols)} onMouseDown={(e) => handleCellMouseDown(e, t.id, r, c)} 
-                                                            onMouseEnter={(e) => handleCellMouseEnter(e, t.id, r, c)} tabIndex={appMode === 'editor' ? -1 : 0} autoComplete="off" 
-                                                        />
-                                                    );
+                                                    const cellId = `${t.id}_${r}_${c}`, isSelected = cellSelection && cellSelection.tableId === t.id && r >= Math.min(cellSelection.startR, cellSelection.endR) && r <= Math.max(cellSelection.startR, cellSelection.endR) && c >= Math.min(cellSelection.startC, cellSelection.endC) && c <= Math.max(cellSelection.startC, cellSelection.endC);
+                                                    cells.push(<input key={cellId} id={cellId} className={`cell-input ${isSelected ? 'bg-blue-50' : ''}`} style={{ right: `${c * cW}px`, top: `${r * cH}px`, width: `${cW}px`, height: `${cH}px`, ...(cellStyles[cellId] || {}), pointerEvents: appMode === 'preview' ? 'none' : 'auto' }} readOnly={appMode === 'preview'} value={data[cellId] || ""} onChange={(e) => handleInputChange(t.id, r, c, e.target.value)} onKeyDown={(e) => handleKeyDown(e, t.id, r, c, t.rows, t.cols)} onMouseDown={(e) => handleCellMouseDown(e, t.id, r, c)} onMouseEnter={(e) => handleCellMouseEnter(e, t.id, r, c)} autoComplete="off" />);
                                                 }
                                             }
-
-                                            let selectionOverlay = null;
-                                            if (cellSelection && cellSelection.tableId === t.id && appMode !== 'editor') {
-                                                const r1 = Math.min(cellSelection.startR, cellSelection.endR); const r2 = Math.max(cellSelection.startR, cellSelection.endR);
-                                                const c1 = Math.min(cellSelection.startC, cellSelection.endC); const c2 = Math.max(cellSelection.startC, cellSelection.endC);
-                                                selectionOverlay = (<div className="selection-overlay" style={{ top: `${r1 * cellH}px`, right: `${c1 * cellW}px`, height: `${(r2 - r1 + 1) * cellH}px`, width: `${(c2 - c1 + 1) * cellW}px` }}><div className="fill-handle" onMouseDown={handleFillHandleMouseDown}></div></div>);
-                                            }
-                                            
-                                            let fillOverlay = null;
-                                            if (isFilling && fillTarget && cellSelection && cellSelection.tableId === t.id) {
-                                                 const fullR1 = Math.min(Math.min(cellSelection.startR, cellSelection.endR), fillTarget.endR); const fullR2 = Math.max(Math.max(cellSelection.startR, cellSelection.endR), fillTarget.endR);
-                                                 const fullC1 = Math.min(Math.min(cellSelection.startC, cellSelection.endC), fillTarget.endC); const fullC2 = Math.max(Math.max(cellSelection.startC, cellSelection.endC), fillTarget.endC);
-                                                 fillOverlay = ( <div className="fill-target-overlay" style={{ top: `${fullR1 * cellH}px`, right: `${fullC1 * cellW}px`, height: `${(fullR2 - fullR1 + 1) * cellH}px`, width: `${(fullC2 - fullC1 + 1) * cellW}px` }}></div> );
-                                            }
-
                                             return (
                                                 <div key={t.id} className="grid-container" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` }}>
                                                     {appMode === 'editor' && (
                                                         <div className="action-btn-group">
-                                                            <div className="mini-btn bg-purple" onClick={(e) => { e.stopPropagation(); refineTablePosition(index, t.id); }} title="דייק מיקום טבלה אוטומטית (מטה קסם)">
-                                                                <Icon name="Wand2" size={14} />
-                                                            </div>
-                                                            <div className="mini-btn bg-red" onClick={(e) => { e.stopPropagation(); deleteTable(page.id, t.id); }}>
-                                                                <Icon name="Trash2" size={14} />
-                                                            </div>
+                                                            <div className="mini-btn bg-purple" onClick={() => refineTablePosition(index, t.id)}><Icon name="Wand2" size={14} /></div>
+                                                            <div className="mini-btn bg-red" onClick={() => deleteTable(page.id, t.id)}><Icon name="Trash2" size={14} /></div>
                                                         </div>
                                                     )}
-                                                    {cells} {selectionOverlay} {fillOverlay}
+                                                    {cells}
                                                 </div>
                                             );
                                         })}
@@ -837,38 +776,62 @@
                                 </div>
                             </div>
                         ))}
-                        {selection && ( <div className="selection-box" style={{ display: 'none' }} /> )}
                     </div>
 
-                    {/* Floating Toolbar - Only in Preview Mode */}
                     {appMode === 'preview' && (
                         <div className="floating-toolbar">
                             <button onClick={() => window.print()} className="btn btn-primary"><Icon name="Printer" /> הדפס / שמור כ-PDF</button>
                             <div className="w-px bg-slate-200 mx-1"></div>
-                            {/* Removed Edit Button */}
                             <button onClick={() => window.location.reload()} className="btn btn-outline"><Icon name="RotateCcw" /> חזרה לעריכה</button>
+                        </div>
+                    )}
+
+                    {showSettings && (
+                        <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
+                                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icon name="Settings" /> הגדרות תבנית</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="input-label">שיטת חישוב תאריכים</label>
+                                        <select className="fancy-input" value={templateMeta.calcMethod} onChange={e => setTemplateMeta({...templateMeta, calcMethod: e.target.value})}>
+                                            <option value="backward">חישוב לאחור (לפי סיום)</option>
+                                            <option value="forward">חישוב קדימה (לפי התחלה)</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input type="checkbox" id="show-name" checked={templateMeta.showNameField} onChange={e => setTemplateMeta({...templateMeta, showNameField: e.target.checked})} className="w-5 h-5" />
+                                        <label htmlFor="show-name" className="font-semibold">הצג שדה שם מנוח בוויזארד</label>
+                                    </div>
+                                    <div>
+                                        <label className="input-label">כותרת ראשית (Wizard)</label>
+                                        <input type="text" className="fancy-input" value={templateMeta.wizardTitles.main} onChange={e => setTemplateMeta({...templateMeta, wizardTitles: {...templateMeta.wizardTitles, main: e.target.value}})} />
+                                    </div>
+                                    <div>
+                                        <label className="input-label">תווית תאריך (Wizard)</label>
+                                        <input type="text" className="fancy-input" value={templateMeta.wizardTitles.dateLabel} onChange={e => setTemplateMeta({...templateMeta, wizardTitles: {...templateMeta.wizardTitles, dateLabel: e.target.value}})} />
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowSettings(false)} className="btn btn-primary w-full mt-6 justify-center">אישור</button>
+                            </div>
                         </div>
                     )}
 
                     {pendingTable && (
                         <div className="popover" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1000 }}>
-                            <h3 className="font-bold text-sm mb-2 text-slate-700">הגדרת טבלה חדשה</h3>
+                            <h3 className="font-bold text-sm mb-2 text-slate-700">הגדרת טבלה</h3>
                             <div className="grid grid-cols-2 gap-2 mb-3">
-                                <div><label className="text-xs text-slate-500 block mb-1">שורות</label><input type="number" className="w-full border rounded px-2 py-1 text-sm" value={newTableConfig.rows} onChange={e => setNewTableConfig({...newTableConfig, rows: e.target.value})} min="1" /></div>
-                                <div><label className="text-xs text-slate-500 block mb-1">עמודות</label><input type="number" className="w-full border rounded px-2 py-1 text-sm" value={newTableConfig.cols} onChange={e => setNewTableConfig({...newTableConfig, cols: e.target.value})} min="1" /></div>
+                                <div><label className="text-xs text-slate-500 block mb-1">שורות</label><input type="number" className="w-full border rounded px-2 py-1 text-sm" value={newTableConfig.rows} onChange={e => setNewTableConfig({...newTableConfig, rows: e.target.value})} /></div>
+                                <div><label className="text-xs text-slate-500 block mb-1">עמודות</label><input type="number" className="w-full border rounded px-2 py-1 text-sm" value={newTableConfig.cols} onChange={e => setNewTableConfig({...newTableConfig, cols: e.target.value})} /></div>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={confirmTable} className="btn btn-primary text-xs w-full justify-center">צור טבלה</button>
-                                <button onClick={() => setPendingTable(null)} className="btn btn-outline text-xs">ביטול</button>
-                            </div>
+                            <div className="flex gap-2"><button onClick={confirmTable} className="btn btn-primary text-xs w-full justify-center">צור</button><button onClick={() => setPendingTable(null)} className="btn btn-outline text-xs">ביטול</button></div>
                         </div>
                     )}
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
+
