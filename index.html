@@ -72,7 +72,6 @@
         border: 1px solid rgba(255,255,255,0.2);
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
         border-radius: 1.5rem;
-        padding: 2.5rem;
         width: 100%;
         max-width: 550px;
         text-align: center;
@@ -80,19 +79,27 @@
         overflow: hidden;
       }
       
+      .logo-header {
+        background: var(--primary-green);
+        padding: 2.5rem 1rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-bottom: 6px solid var(--accent-gold);
+      }
+
+      .card-content {
+        padding: 2rem 2.5rem 2.5rem 2.5rem;
+      }
+
       @media (max-width: 640px) {
           .glass-card {
-              padding: 1.5rem;
               max-height: 95vh;
               overflow-y: auto;
           }
-      }
-
-      .glass-card::before {
-        content: "";
-        position: absolute;
-        top: 0; left: 0; right: 0; height: 8px;
-        background: var(--accent-gold);
+          .card-content {
+              padding: 1.5rem;
+          }
       }
 
       .title-serif {
@@ -311,7 +318,6 @@
 
       .logo-img {
         max-width: 180px;
-        margin-bottom: 1rem;
         display: block;
       }
 
@@ -410,10 +416,12 @@
                 const searchStr = window.location.search.substring(1);
                 const mode = urlParams.get('mode');
                 
-                // Smart template loading: ?13 -> 13.json, ?t=13 -> 13.json
+                // Smart template loading: ?13 -> 13.json, ?select -> select.json
                 let templateId = urlParams.get('t');
-                if (!templateId && searchStr && !isNaN(searchStr)) {
-                    templateId = searchStr;
+                if (!templateId && searchStr) {
+                    if (!searchStr.includes('=')) {
+                        templateId = searchStr;
+                    }
                 }
 
                 const tryLoadTemplate = async () => {
@@ -495,7 +503,7 @@
             const availableMonths = useMemo(() => { return [ "Tishrei", "Cheshvan", "Kislev", "Tevet", "Sh'vat", ...(isLeap ? ["Adar I", "Adar II"] : ["Adar"]), "Nisan", "Iyar", "Sivan", "Tamuz", "Av", "Elul" ]; }, [isLeap]);
             useEffect(() => { if (!availableMonths.includes(selectedMonth)) { if (selectedMonth.includes("Adar")) setSelectedMonth(isLeap ? "Adar II" : "Adar"); else setSelectedMonth(availableMonths[0]); } }, [selectedYear, isLeap, availableMonths]);
             const years = Array.from({length: 20}, (_, i) => today.getFullYear() - 5 + i);
-            const formatHNum = (n) => { const map = {1:'א',2:'ב',3:'ג',4:'ד',5:'ה',6:'ו',7:'ז',8:'ח',9:'ט',10:'י',11:'יא',12:'יב',13:'יג',14:'יד',15:'טו',16:'טז',17:'יז',18:'יח',19:'יט',20:'כ',21:'כא',22:'כב',23:'כג',24:'כד',25:'כה',26:'כו',27:'כז',28:'כח',29:'כט',30:'ל'}; return map[n] || n; };
+            const formatHNum = (n) => { const map = {1:'א',2:'ב',3:'ג',4:'ד',5:'ה',6:'ו',7:'ז',8:'ח',9:'ט',10:'י',11:'יא',12:'יב',13:'יג',14:'יד',15:'טו',16:'טז',17:'יז',18:'יח',19:'יט',20:'כ',21:'כא',22:'כב',23:'כג',24:'כד',25:'כה',26:'כו',27:'כז',28:'כח',29:'כד',30:'ל'}; return map[n] || n; };
             const monthHebrewDisplay = { "Nisan": "ניסן", "Iyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול", "Tishrei": "תשרי", "Cheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", "Sh'vat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'" };
             const getYearStr = (y) => { if (typeof gematriya === 'function') return gematriya(y); try { return new HDate(1, "Tishrei", y).render('he').split(' ').pop().replace('הת',''); } catch(e) { return y; } };
 
@@ -563,7 +571,6 @@
 
                     const formatFullDate = (d) => { const yHeb = typeof gematriya === 'function' ? gematriya(d.getFullYear()) : d.getFullYear(); const dHeb = typeof gematriya === 'function' ? gematriya(d.getDate()) : d.getDate(); const mHeb = monthHebrewNames[d.getMonthName()] || d.getMonthName(); return `${dHeb} ${mHeb} ${yHeb}`; };
 
-                    // Warn if backward calculation starts in the past
                     const todayH = new HDate();
                     if (effectiveCalcMethod === 'backward' && startDate.abs() < todayH.abs()) {
                         alert(`שים לב: לפי תאריך היעד שבחרת, הלימוד היה צריך להתחיל ב-${formatFullDate(startDate)}. תאריך זה כבר עבר.`);
@@ -581,7 +588,6 @@
             const startDragging = (e, pageId, tableId) => {
                 if (appMode !== 'editor') return;
                 e.preventDefault(); e.stopPropagation();
-                const page = pages.find(p => p.id === pageId);
                 const rect = e.currentTarget.parentElement.parentElement.getBoundingClientRect();
                 setDragInfo({ pageId, tableId, offsetX: (e.clientX - rect.left) / previewScale, offsetY: (e.clientY - rect.top) / previewScale });
             };
@@ -636,39 +642,43 @@
                 return (
                     <div className="hero-overlay">
                         <div className="glass-card fade-in">
-                            <img src="logo.png" alt="דף היומי במשניות" className="logo-img mx-auto" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block'; }} />
-                            <div style={{display:'none'}} className="title-serif text-3xl font-bold mb-4 text-primary-green">דף היומי במשניות</div>
+                            <div className="logo-header">
+                                <img src="logo.png" alt="דף היומי במשניות" className="logo-img mx-auto" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block'; }} />
+                                <div style={{display:'none'}} className="title-serif text-3xl font-bold text-white">דף היומי במשניות</div>
+                            </div>
                             
-                            <h1 className="text-2xl font-bold title-serif mb-6">{templateMeta.wizardTitles.main}</h1>
-                            <div className="space-y-5">
-                                <div className="input-wrapper">
-                                    <label className="input-label">{templateMeta.wizardTitles.dateLabel}</label>
-                                    <div className="flex gap-2 flex-col sm:flex-row">
-                                        <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
-                                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">{availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}</select>
-                                        <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">{years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}</select>
-                                    </div>
-                                </div>
-
-                                {templateMeta.calcMethodType === 'user-selectable' && (
+                            <div className="card-content">
+                                <h1 className="text-2xl font-bold title-serif mb-6">{templateMeta.wizardTitles.main}</h1>
+                                <div className="space-y-5">
                                     <div className="input-wrapper">
-                                        <label className="input-label">חישוב לוח לימוד</label>
-                                        <div className="calc-toggle">
-                                            <div className={`calc-option ${wizardCalcMode === 'forward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</div>
-                                            <div className={`calc-option ${wizardCalcMode === 'backward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</div>
+                                        <label className="input-label">{templateMeta.wizardTitles.dateLabel}</label>
+                                        <div className="flex gap-2 flex-col sm:flex-row">
+                                            <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
+                                            <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">{availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}</select>
+                                            <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">{years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}</select>
                                         </div>
                                     </div>
-                                )}
 
-                                {templateMeta.showNameField && (
-                                    <div className="input-wrapper">
-                                        <label className="input-label">{templateMeta.nameLabel}</label>
-                                        <input type="text" className="fancy-input" placeholder={templateMeta.namePlaceholder} value={deceasedName} onChange={e => setDeceasedName(e.target.value)} />
-                                    </div>
-                                )}
-                                
-                                <button onClick={handleWizardSubmit} className="generate-btn w-full justify-center mt-4">צור לוח לימוד</button>
-                                <p className="text-xs text-slate-400 mt-4">© כל הזכויות שמורות למיזם דף היומי במשניות</p>
+                                    {templateMeta.calcMethodType === 'user-selectable' && (
+                                        <div className="input-wrapper">
+                                            <label className="input-label">חישוב לוח לימוד</label>
+                                            <div className="calc-toggle">
+                                                <div className={`calc-option ${wizardCalcMode === 'forward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</div>
+                                                <div className={`calc-option ${wizardCalcMode === 'backward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {templateMeta.showNameField && (
+                                        <div className="input-wrapper">
+                                            <label className="input-label">{templateMeta.nameLabel}</label>
+                                            <input type="text" className="fancy-input" placeholder={templateMeta.namePlaceholder} value={deceasedName} onChange={e => setDeceasedName(e.target.value)} />
+                                        </div>
+                                    )}
+                                    
+                                    <button onClick={handleWizardSubmit} className="generate-btn w-full justify-center mt-4">צור לוח לימוד</button>
+                                    <p className="text-xs text-slate-400 mt-4">© כל הזכויות שמורות למיזם דף היומי במשניות</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -749,7 +759,7 @@
                                                 <option value="user-selectable">בחירת משתמש בוויזארד</option>
                                             </select>
                                         </div>
-                                        <div className="h-px bg-slate-100 my-2"></div>
+                                        <div className="h-px bg-slate-100 my-2) mt-2"></div>
                                         <div>
                                             <label className="input-label">כותרת ראשית (Wizard)</label>
                                             <input type="text" className="fancy-input" value={templateMeta.wizardTitles.main} onChange={e => setTemplateMeta({...templateMeta, wizardTitles: {...templateMeta.wizardTitles, main: e.target.value}})} />
