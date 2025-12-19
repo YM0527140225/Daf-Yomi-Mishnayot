@@ -54,11 +54,11 @@
         overflow-x: hidden;
       }
 
-      /* --- WIZARD STYLES (INVERTED) --- */
+      /* --- WIZARD STYLES (INVERTED & COMPACT) --- */
       .hero-overlay {
         position: fixed;
         inset: 0;
-        background: #f1f5f1; /* Light background for the whole page */
+        background: #f1f5f1;
         background-image: radial-gradient(circle at center, rgba(0,0,0,0.02) 0%, transparent 70%);
         display: flex;
         align-items: center;
@@ -68,12 +68,12 @@
       }
 
       .glass-card {
-        background: var(--primary-green); /* Dark green card */
+        background: var(--primary-green);
         border: 1px solid rgba(255,255,255,0.1);
         box-shadow: 0 40px 80px -20px rgba(0, 40, 30, 0.4);
-        border-radius: 1.5rem;
+        border-radius: 1.25rem;
         width: 100%;
-        max-width: 550px;
+        max-width: 480px; /* Sligtly narrower */
         text-align: center;
         position: relative;
         overflow: hidden;
@@ -82,14 +82,14 @@
       
       .logo-header {
         background: var(--primary-green);
-        padding: 3rem 1rem 1.5rem 1rem;
+        padding: 1.75rem 1rem 1rem 1rem; /* Reduced padding height */
         display: flex;
         justify-content: center;
         align-items: center;
       }
 
       .card-content {
-        padding: 1rem 2.5rem 3rem 2.5rem;
+        padding: 0.5rem 2rem 2rem 2rem; /* Reduced top padding */
       }
 
       @media (max-width: 640px) {
@@ -98,35 +98,35 @@
               overflow-y: auto;
           }
           .card-content {
-              padding: 1.5rem;
+              padding: 1.25rem;
           }
       }
 
       .title-serif {
         font-family: 'Frank Ruhl Libre', serif;
-        color: var(--accent-gold); /* Gold title on green */
+        color: var(--accent-gold);
       }
 
       .input-wrapper {
         text-align: right;
-        margin-bottom: 1.25rem;
+        margin-bottom: 1rem; /* Compact margin */
       }
 
       .input-label {
         display: block;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         font-weight: 700;
-        color: white; /* White labels on green */
-        margin-bottom: 0.5rem;
+        color: white;
+        margin-bottom: 0.35rem;
         opacity: 0.95;
       }
 
       .fancy-input {
         width: 100%;
-        padding: 0.75rem 1rem;
+        padding: 0.65rem 1rem; /* Slimmer inputs */
         border: 1px solid rgba(255,255,255,0.2);
         border-radius: 50px; 
-        font-size: 1rem;
+        font-size: 0.95rem;
         transition: all 0.2s;
         background: white;
         color: var(--dark-text);
@@ -140,9 +140,9 @@
       .generate-btn {
         background: var(--accent-gold);
         color: var(--primary-green);
-        font-size: 1.25rem;
+        font-size: 1.15rem;
         font-weight: 800;
-        padding: 0.85rem 3rem;
+        padding: 0.75rem 2rem; /* Slimmer button */
         border-radius: 50px;
         border: none;
         cursor: pointer;
@@ -159,11 +159,10 @@
         background: #f1d9a5;
       }
       
-      /* Footer text in wizard */
       .wizard-footer {
-        font-size: 0.75rem;
-        color: rgba(255,255,255,0.5);
-        margin-top: 1.5rem;
+        font-size: 0.7rem;
+        color: rgba(255,255,255,0.4);
+        margin-top: 1.25rem;
       }
 
       /* --- LOADER --- */
@@ -327,7 +326,7 @@
       }
 
       .logo-img {
-        max-width: 200px;
+        max-width: 160px; /* Reduced logo size */
         display: block;
       }
 
@@ -336,14 +335,14 @@
         background: rgba(255,255,255,0.1);
         padding: 4px;
         border-radius: 50px;
-        margin-top: 0.5rem;
+        margin-top: 0.35rem;
       }
       .calc-option {
         flex: 1;
-        padding: 8px;
+        padding: 7px;
         border-radius: 50px;
         cursor: pointer;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         font-weight: 700;
         transition: all 0.2s;
         text-align: center;
@@ -586,7 +585,17 @@
                         alert(`שים לב: לפי תאריך היעד שבחרת, הלימוד היה צריך להתחיל ב-${formatFullDate(startDate)}. תאריך זה כבר עבר.`);
                     }
 
-                    monthCells.forEach(item => { const months = groupMonths[item.group]; if (months && months.size > 0) { newData[item.key] = Array.from(months).reverse().join(' - '); newStyles[item.key] = stylesMap.month; } });
+                    monthCells.forEach(item => { 
+                        const months = groupMonths[item.group]; 
+                        if (months && months.size > 0) { 
+                            // If forward, keep chronological. If backward, reverse to match (Start - End)
+                            newData[item.key] = effectiveCalcMethod === 'forward' 
+                                ? Array.from(months).join(' - ') 
+                                : Array.from(months).reverse().join(' - '); 
+                            newStyles[item.key] = stylesMap.month; 
+                        } 
+                    });
+                    
                     findCells(/\{\{start\}\}/i).forEach(c => { newData[c.key] = formatFullDate(startDate); newStyles[c.key] = stylesMap.meta; });
                     findCells(/\{\{end\}\}/i).forEach(c => { newData[c.key] = formatFullDate(endDate); newStyles[c.key] = stylesMap.meta; });
 
@@ -658,8 +667,8 @@
                             </div>
                             
                             <div className="card-content">
-                                <h1 className="text-2xl font-bold title-serif mb-8">{templateMeta.wizardTitles.main}</h1>
-                                <div className="space-y-6">
+                                <h1 className="text-2xl font-bold title-serif mb-6">{templateMeta.wizardTitles.main}</h1>
+                                <div className="space-y-4">
                                     <div className="input-wrapper">
                                         <label className="input-label">{templateMeta.wizardTitles.dateLabel}</label>
                                         <div className="flex gap-2 flex-col sm:flex-row">
