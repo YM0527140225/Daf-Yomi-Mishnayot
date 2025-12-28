@@ -315,16 +315,16 @@
       .btn-secondary:hover { background: rgba(255,255,255,0.2); }
       .btn-outline { background: white; border: 1px solid #cbd5e1; color: var(--primary-green); }
 
-      /* --- CRITICAL PRINT FIX FOR MOBILE --- */
+      /* --- CRITICAL PRINT FIX FOR MOBILE & MULTI-PAGE --- */
       @media print {
         @page { margin: 0; size: A4 portrait; }
         
         html, body {
           width: 210mm !important;
-          height: 297mm !important;
+          height: auto !important; /* Fixed: Allow height to grow for multiple pages */
           margin: 0 !important;
           padding: 0 !important;
-          overflow: hidden !important;
+          overflow: visible !important; /* Fixed: Show all pages */
           background: white !important;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
@@ -332,7 +332,7 @@
 
         #root {
           width: 210mm !important;
-          height: 297mm !important;
+          height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
         }
@@ -340,7 +340,7 @@
         .workspace {
           display: block !important;
           width: 210mm !important;
-          height: 297mm !important;
+          height: auto !important; /* Fixed */
           margin: 0 !important;
           padding: 0 !important;
           background: white !important;
@@ -357,6 +357,7 @@
           page-break-after: always !important;
           break-after: page !important;
           display: block !important;
+          position: relative !important;
         }
 
         .page-container {
