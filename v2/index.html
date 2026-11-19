@@ -729,6 +729,7 @@
 
         function seatOnRules() {
             const seats = {};
+            const monthSeats = [];
             document.querySelectorAll('.page-container').forEach(page => {
                 const img = page.querySelector('img.pdf-bg-img');
                 if (!img || !img.naturalWidth) return;
@@ -770,6 +771,37 @@
                     }
                     return rows;
                 };
+                const full = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const lumAt = (x, y) => {
+                    if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return 255;
+                    const i = (y * canvas.width + x) * 4;
+                    return (full.data[i] + full.data[i + 1] + full.data[i + 2]) / 3;
+                };
+                const underlines = [];
+                for (let iy = 2; iy < canvas.height - 2; iy++) {
+                    let start = null;
+                    const keep = (end) => {
+                        const cssLen = (end - start) / sx;
+                        if (cssLen < 40 || cssLen > 52) return;
+                        const mid = start + ((end - start) >> 1);
+                        if (lumAt(mid, iy - 6) < 180 || lumAt(mid, iy + 6) < 180) return;
+                        underlines.push({
+                            y: (iy + 0.5) / sy,
+                            x0: start / sx,
+                            x1: end / sx,
+                            cx: (start + end) / 2 / sx
+                        });
+                    };
+                    for (let ix = 0; ix < canvas.width; ix++) {
+                        if (lumAt(ix, iy) < 105) {
+                            if (start === null) start = ix;
+                        } else if (start !== null) {
+                            keep(ix);
+                            start = null;
+                        }
+                    }
+                    if (start !== null) keep(canvas.width);
+                }
                 page.querySelectorAll('.slot-cell[data-role]').forEach(cell => {
                     const role = cell.dataset.role;
                     if (!cell.dataset.id || !cell.textContent.trim()) return;
@@ -778,18 +810,38 @@
                     const y = grid.offsetTop + cell.offsetTop;
                     const w = cell.offsetWidth;
                     const h = cell.offsetHeight;
+                    if (role === 'month') {
+                        const cx = x + w / 2;
+                        let best = null;
+                        let bestDist = 1e9;
+                        underlines.forEach(line => {
+                            if (line.y < y + h * 0.35 || line.y > y + h + 3) return;
+                            if (line.cx < x - 8 || line.cx > x + w + 8) return;
+                            const dist = Math.abs(line.cx - cx) + Math.abs(line.y - (y + h - 4)) * 0.35;
+                            if (dist < bestDist) { bestDist = dist; best = line; }
+                        });
+                        if (!best) return;
+                        const seat = {
+                            baseline: best.y - 2,
+                            center: best.cx,
+                            ruleW: Math.max(8, best.x1 - best.x0),
+                            ruleY: best.y
+                        };
+                        seats[cell.dataset.id] = seat;
+                        monthSeats.push({ id: cell.dataset.id, text: cell.textContent.trim(), seat: seat });
+                        return;
+                    }
                     const rec = read(x * sx, (y - 1) * sy, (x + w) * sx, (y + h + 4) * sy);
                     if (!rec) return;
                     const threshold = role === 'date' ? 185 : 140;
                     const rows = rowsOf(rec, threshold);
-                    const minFrac = role === 'month' ? 0.22 : role === 'date' ? 0.28 : 0.4;
-                    const maxFrac = role === 'month' ? 0.9 : 1;
+                    const minFrac = role === 'date' ? 0.28 : 0.4;
                     let bestScore = 0;
                     let chosen = null;
                     rows.forEach((row, iy) => {
                         const cssY = (rec.iy0 + iy) / sy;
-                        if (cssY < y + h * 0.35 || cssY > y + h + 2) return;
-                        if (row.best < rec.w * minFrac || row.best > rec.w * maxFrac) return;
+                        if (cssY < y + h * 0.45 || cssY > y + h + 2) return;
+                        if (row.best < rec.w * minFrac) return;
                         const neighbor = Math.max(iy >= 3 ? rows[iy - 3].best : 0, iy + 3 < rows.length ? rows[iy + 3].best : 0);
                         const score = row.best - neighbor;
                         if (score > bestScore) { bestScore = score; chosen = row; }
@@ -799,12 +851,19 @@
                     const ruleX0 = (rec.ix0 + chosen.a) / sx;
                     const ruleX1 = (rec.ix0 + chosen.b + 1) / sx;
                     seats[cell.dataset.id] = {
-                        baseline: ruleY - (role === 'date' ? 2.6 : 2),
+                        baseline: ruleY - 2,
                         center: (ruleX0 + ruleX1) / 2,
-                        ruleW: Math.max(8, ruleX1 - ruleX0)
+                        ruleW: Math.max(8, ruleX1 - ruleX0),
+                        ruleY: ruleY
                     };
                 });
             });
+            let sharedPx = 9;
+            monthSeats.forEach(item => {
+                const fitted = fitPx(item.text, Math.max(12, item.seat.ruleW - 4), 18, 9, 700);
+                if (fitted < sharedPx) sharedPx = fitted;
+            });
+            monthSeats.forEach(item => { item.seat.px = sharedPx; });
             return seats;
         }
 
@@ -1402,8 +1461,8 @@
                                                             const role = style.fontSize === '7.5px' ? 'date' : style.fontSize === '9px' ? 'month' : style.fontSize === '11px' ? 'range' : style.fontSize === '13px' ? 'name' : '';
                                                             const seat = seats[id];
                                                             const cap = role === 'date' ? 6.25 : maxPx;
-                                                            const fitWidth = seat && role !== 'date' ? Math.min(cW, seat.ruleW + (role === 'month' ? 2 : 4)) : cW;
-                                                            const px = fitPx(text, fitWidth, cH, cap, role === 'date' ? 600 : weight);
+                                                            const fitWidth = seat && role !== 'date' && role !== 'month' ? Math.min(cW, seat.ruleW - 4) : cW;
+                                                            const px = role === 'month' && seat && seat.px ? seat.px : fitPx(text, fitWidth, cH, cap, role === 'date' ? 600 : weight);
                                                             const usedWeight = role === 'date' ? 600 : weight;
                                                             const width = textWidth(text, px, usedWeight);
                                                             const cellX = slot.x + c * cW;
