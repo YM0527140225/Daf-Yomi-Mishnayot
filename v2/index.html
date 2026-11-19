@@ -717,6 +717,17 @@
             return 4;
         }
 
+        function inkShiftY(text, px, weight) {
+            if (!text) return 0;
+            if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+            measureCtx.font = weight + ' ' + px + 'px Assistant, Arial, sans-serif';
+            const metrics = measureCtx.measureText(text);
+            const asc = metrics.actualBoundingBoxAscent || 0;
+            const desc = metrics.actualBoundingBoxDescent || 0;
+            const dy = 0.35 * px + (desc - asc) / 2;
+            return -dy;
+        }
+
         function daysInHebrewMonth(year, monthName) {
             try {
                 const first = new HDate(1, monthName, parseInt(year, 10));
@@ -1160,7 +1171,14 @@
                             const font = getComputedStyle(span);
                             const box = cell.getBoundingClientRect();
                             ctx.font = font.fontWeight + ' ' + font.fontSize + ' ' + font.fontFamily;
-                            ctx.fillText(text, (box.left - origin.left) + box.width / 2, (box.top - origin.top) + box.height / 2);
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'alphabetic';
+                            const metrics = ctx.measureText(text);
+                            const asc = metrics.actualBoundingBoxAscent || 0;
+                            const desc = metrics.actualBoundingBoxDescent || 0;
+                            const cx = (box.left - origin.left) + box.width / 2;
+                            const cy = (box.top - origin.top) + box.height / 2;
+                            ctx.fillText(text, cx, cy - (desc - asc) / 2);
                         });
                         const bytes = await fetch(canvas.toDataURL('image/jpeg', 0.92)).then(res => res.arrayBuffer());
                         const embedded = await pdf.embedJpg(bytes);
@@ -1299,7 +1317,8 @@
                                                             const maxPx = parseFloat(style.fontSize) || 8;
                                                             const px = fitPx(text, cW, cH, maxPx, weight);
                                                             const role = style.fontSize === '7.5px' ? 'date' : style.fontSize === '9px' ? 'month' : style.fontSize === '11px' ? 'range' : style.fontSize === '13px' ? 'name' : '';
-                                                            return <div key={id} className="slot-cell" data-role={role || undefined} data-date={role === 'date' ? text : undefined} style={{ fontWeight: weight }}><span style={{ fontSize: px + 'px' }}>{text}</span></div>;
+                                                            const shift = inkShiftY(text, px, weight);
+                                                            return <div key={id} className="slot-cell" data-role={role || undefined} data-date={role === 'date' ? text : undefined} style={{ fontWeight: weight }}><span style={{ fontSize: px + 'px', transform: 'translateY(' + shift.toFixed(2) + 'px)' }}>{text}</span></div>;
                                                         }))}
                                                     </div>
                                                 );
