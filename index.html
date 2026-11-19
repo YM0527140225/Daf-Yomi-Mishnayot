@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>מחולל לוחות לימוד - דף היומי במשניות</title>
+    <!--
+      אותו קובץ יכול להחליף את index.html בשורש בלי שינוי נתיב.
+      info.json, 13.json, select.json ו-logo.png נטענים קודם מהתיקייה של הדף,
+      ואם אינם שם — מהתיקייה שמעליה (כך התצוגה מ-v2/ עובדת מול קבצי השורש).
+    -->
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,6 +30,7 @@
 
     <!-- Hebcal (Hebrew Dates) -->
     <script src="https://cdn.jsdelivr.net/npm/@hebcal/core@5.3.0/dist/bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -196,7 +202,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 2rem;
+        padding: 2rem 2rem 96px;
         gap: 2rem;
         min-height: calc(100vh - 70px);
         overflow: auto;
@@ -293,20 +299,74 @@
       .edit-mode .cell-input { border: 1px solid rgba(0,0,0,0.05); pointer-events: none; }
       .view-mode .cell-input { pointer-events: auto; }
 
-      .floating-toolbar {
+      .action-bar {
         position: fixed;
-        bottom: 2rem;
-        left: 50%;
-        transform: translateX(-50%);
-        background: white;
-        padding: 0.75rem 1.5rem;
-        border-radius: 50px;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        z-index: 60;
+        left: 0;
+        right: 0;
+        bottom: 0;
         display: flex;
+        gap: 8px;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+        background: #fff;
+        border-top: 1px solid #e2e8f0;
+        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08);
+      }
+      .action-bar button {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 44px;
+        padding: 0 8px;
+        border-radius: 12px;
+        font-family: 'Assistant', sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        line-height: 1;
+      }
+      .action-bar .act-back,
+      .action-bar .act-download {
+        background: #fff;
+        color: var(--primary-green);
+        border: 1px solid #c5d0cb;
+      }
+      .action-bar .act-print {
+        background: var(--accent-gold);
+        color: var(--primary-green);
+        border: 1px solid var(--accent-gold);
+      }
+      @media (min-width: 720px) {
+        .action-bar {
+          left: 50%;
+          right: auto;
+          bottom: 16px;
+          transform: translateX(-50%);
+          width: 480px;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+        }
+      }
+      .mode-quiet {
+        display: flex;
+        justify-content: center;
         gap: 1rem;
-        z-index: 50;
-        border: 1px solid #e2e8f0;
-        animation: slideUp 0.5s ease-out;
+        margin: -0.15rem 0 0.15rem;
+      }
+      .mode-quiet button {
+        background: none;
+        border: none;
+        padding: 2px 0;
+        cursor: pointer;
+        color: rgba(255,255,255,0.72);
+        font-family: 'Assistant', sans-serif;
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .mode-quiet button.on {
+        color: var(--accent-gold);
+        font-weight: 800;
       }
       
       .btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 999px; font-weight: 600; transition: all 0.2s; cursor: pointer; font-size: 0.95rem; border: none; }
@@ -373,13 +433,14 @@
           left: 0 !important;
         }
 
-        .hero-overlay, .floating-toolbar, .toolbar, .action-btn-group, .popover, .no-print, .btn, .mini-btn { 
+        .hero-overlay, .floating-toolbar, .action-bar, .toolbar, .action-btn-group, .popover, .no-print, .btn, .mini-btn { 
           display: none !important; 
         }
 
-        .cell-input { 
-          border: none !important; 
-          background: transparent !important; 
+        .cell-input, .slot-grid, .slot-cell, .slot-cell span {
+          border: none !important;
+          background: transparent !important;
+          box-shadow: none !important;
         }
       }
 
@@ -418,6 +479,194 @@
         pointer-events: none;
         z-index: 100;
       }
+
+      a.calc-option { text-decoration: none; color: white; }
+      a.calc-option.active { color: var(--primary-green); }
+
+      .slot-grid {
+        position: absolute;
+        display: grid;
+        direction: ltr;
+        background: transparent;
+        z-index: 2;
+        pointer-events: none;
+        margin: 0;
+        padding: 0;
+      }
+      .slot-cell {
+        position: relative;
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+        min-width: 0;
+        min-height: 0;
+        color: #111;
+        font-family: 'Assistant', sans-serif;
+        line-height: 1;
+        text-align: center;
+      }
+      .slot-cell > span {
+        position: absolute;
+        display: block;
+        margin: 0;
+        padding: 0;
+        line-height: 1;
+        white-space: nowrap;
+        text-align: center;
+        direction: rtl;
+        background: transparent;
+        border: none;
+        top: 0;
+        left: 0;
+      }
+
+      /* Structured schedule: real cells, not text laid over a background. */
+      .sheet-scale { transform-origin: top center; }
+      .sheet {
+        width: 210mm;
+        height: 297mm;
+        box-sizing: border-box;
+        background: #17261c;
+        color: #f3e7c3;
+        padding: 4mm 4.2mm 3.2mm;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5mm;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+        font-family: 'Assistant', sans-serif;
+      }
+      .sheet-head { text-align: center; flex: 0 0 auto; }
+      .sheet-head h1, .sheet-head h2 {
+        font-family: 'Frank Ruhl Libre', serif;
+        color: #efe2a4;
+        margin: 0;
+        font-weight: 700;
+        line-height: 1.15;
+      }
+      .sheet-head h1 { font-size: 16.5pt; }
+      .sheet-head h2 { font-size: 12pt; margin-bottom: 1.2mm; }
+      .sheet-range {
+        background: #fff;
+        color: #143028;
+        display: inline-block;
+        min-width: 118mm;
+        padding: 0.7mm 4mm;
+        font-weight: 800;
+        font-size: 10pt;
+      }
+      .sheet-range b { font-weight: 800; }
+      .sheet-grid {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-auto-rows: 1fr;
+        gap: 1.5mm;
+        direction: rtl;
+      }
+      .study-card {
+        background: #fff;
+        color: #142018;
+        border: 0.35mm solid #1a1a1a;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .study-month {
+        flex: 0 0 auto;
+        background: #f4f1e6;
+        text-align: center;
+        font-weight: 800;
+        font-size: 8pt;
+        padding: 0.45mm 1mm;
+        border-bottom: 0.25mm solid #1a1a1a;
+        display: flex;
+        justify-content: center;
+        align-items: baseline;
+        gap: 1.6mm;
+      }
+      .study-month .month-k { font-weight: 700; font-size: 7pt; }
+      .study-head, .study-row {
+        display: grid;
+        grid-template-columns: 15mm 1fr 1fr;
+        direction: rtl;
+      }
+      .study-head {
+        flex: 0 0 auto;
+        background: #fff;
+        font-size: 7pt;
+        font-weight: 800;
+        text-align: center;
+        border-bottom: 0.25mm solid #1a1a1a;
+      }
+      .study-head span, .study-date, .study-cell {
+        border-left: 0.15mm solid #c5c9c6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        min-height: 0;
+      }
+      .study-head span:last-child, .study-row > :last-child { border-left: none; }
+      .study-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+      .study-row { flex: 1 1 0; min-height: 0; border-bottom: 0.12mm solid #d7d7d7; }
+      .study-row:last-child { border-bottom: none; }
+      .study-date {
+        font-size: 6pt;
+        font-weight: 700;
+        line-height: 1.05;
+        text-align: center;
+        padding: 0 0.2mm;
+      }
+      .study-cell { background: #fff; line-height: 0; }
+      .study-cell img { width: 100%; height: 100%; object-fit: fill; display: block; }
+      .sheet-foot { flex: 0 0 auto; text-align: center; }
+      .dedic {
+        background: #fffef8;
+        color: #143028;
+        border-radius: 999px;
+        display: inline-flex;
+        gap: 2mm;
+        align-items: baseline;
+        justify-content: center;
+        padding: 0.55mm 5mm;
+        font-family: 'Frank Ruhl Libre', serif;
+        font-size: 10.5pt;
+        font-weight: 700;
+        margin: 0 0 0.8mm;
+      }
+      .dedic .who {
+        min-width: 42mm;
+        border-bottom: 0.3mm solid #143028;
+        font-family: 'Assistant', sans-serif;
+        font-weight: 800;
+        font-size: 10pt;
+        line-height: 1.1;
+      }
+      .sheet-footer-img { width: 100%; height: 20mm; object-fit: contain; object-position: center bottom; display: block; }
+
+      @media print {
+        .sheet-scale {
+          transform: none !important;
+          margin: 0 !important;
+        }
+        .sheet {
+          box-shadow: none !important;
+          page-break-after: always;
+          break-after: page;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        .sheet:last-child { page-break-after: auto; break-after: auto; }
+      }
     </style>
 </head>
 <body>
@@ -443,9 +692,337 @@
             );
         };
 
+        const PAGE_CSS_WIDTH = 210 * 96 / 25.4;
+
+        async function fetchAsset(filename) {
+            const candidates = [filename, '../' + filename];
+            for (let i = 0; i < candidates.length; i++) {
+                try {
+                    const response = await fetch(candidates[i]);
+                    if (response.ok) return { response: response, url: candidates[i] };
+                } catch (err) { /* try the next location */ }
+            }
+            throw new Error(filename);
+        }
+
+        let measureCtx = null;
+        function fitPx(text, width, height, maxPx, weight) {
+            const cap = Math.max(4, Math.min(maxPx || 8, (height || 8) * 0.82));
+            if (!text) return cap;
+            if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+            let px = cap;
+            while (px > 4) {
+                measureCtx.font = weight + ' ' + px + 'px Assistant, Arial, sans-serif';
+                if (measureCtx.measureText(text).width <= Math.max(4, width - 2)) return px;
+                px -= 0.25;
+            }
+            return 4;
+        }
+
+        const INK_BOTTOM = 0.80;
+
+        function textWidth(text, px, weight) {
+            if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+            measureCtx.font = weight + ' ' + px + 'px Assistant, Arial, sans-serif';
+            return measureCtx.measureText(text || '').width;
+        }
+
+        function seatOnRules() {
+            const seats = {};
+            const monthSeats = [];
+            document.querySelectorAll('.page-container').forEach(page => {
+                const img = page.querySelector('img.pdf-bg-img');
+                if (!img || !img.naturalWidth) return;
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0);
+                const sx = img.naturalWidth / page.offsetWidth;
+                const sy = img.naturalHeight / page.offsetHeight;
+                const read = (x0, y0, x1, y1) => {
+                    const ix0 = Math.max(0, Math.floor(x0));
+                    const iy0 = Math.max(0, Math.floor(y0));
+                    const ix1 = Math.min(canvas.width, Math.ceil(x1));
+                    const iy1 = Math.min(canvas.height, Math.ceil(y1));
+                    const w = ix1 - ix0, h = iy1 - iy0;
+                    if (w < 2 || h < 2) return null;
+                    return { data: ctx.getImageData(ix0, iy0, w, h).data, w, h, ix0, iy0 };
+                };
+                const lum = (rec, x, y) => {
+                    const i = (y * rec.w + x) * 4;
+                    return (rec.data[i] + rec.data[i + 1] + rec.data[i + 2]) / 3;
+                };
+                const rowsOf = (rec, threshold) => {
+                    const rows = [];
+                    for (let iy = 0; iy < rec.h; iy++) {
+                        let run = 0, best = 0, start = null, a = 0, b = 0;
+                        for (let ix = 0; ix < rec.w; ix++) {
+                            if (lum(rec, ix, iy) < threshold) {
+                                if (start === null) start = ix;
+                                run++;
+                            } else {
+                                if (run > best) { best = run; a = start; b = start + run - 1; }
+                                run = 0; start = null;
+                            }
+                        }
+                        if (run > best) { best = run; a = start; b = start + run - 1; }
+                        rows.push({ iy, best, a, b });
+                    }
+                    return rows;
+                };
+                const full = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const lumAt = (x, y) => {
+                    if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return 255;
+                    const i = (y * canvas.width + x) * 4;
+                    return (full.data[i] + full.data[i + 1] + full.data[i + 2]) / 3;
+                };
+                const underlines = [];
+                for (let iy = 2; iy < canvas.height - 2; iy++) {
+                    let start = null;
+                    const keep = (end) => {
+                        const cssLen = (end - start) / sx;
+                        if (cssLen < 40 || cssLen > 52) return;
+                        const mid = start + ((end - start) >> 1);
+                        if (lumAt(mid, iy - 6) < 180 || lumAt(mid, iy + 6) < 180) return;
+                        underlines.push({
+                            y: (iy + 0.5) / sy,
+                            x0: start / sx,
+                            x1: end / sx,
+                            cx: (start + end) / 2 / sx
+                        });
+                    };
+                    for (let ix = 0; ix < canvas.width; ix++) {
+                        if (lumAt(ix, iy) < 105) {
+                            if (start === null) start = ix;
+                        } else if (start !== null) {
+                            keep(ix);
+                            start = null;
+                        }
+                    }
+                    if (start !== null) keep(canvas.width);
+                }
+                page.querySelectorAll('.slot-cell[data-role]').forEach(cell => {
+                    const role = cell.dataset.role;
+                    if (!cell.dataset.id || !cell.textContent.trim()) return;
+                    const grid = cell.parentElement;
+                    const x = grid.offsetLeft + cell.offsetLeft;
+                    const y = grid.offsetTop + cell.offsetTop;
+                    const w = cell.offsetWidth;
+                    const h = cell.offsetHeight;
+                    if (role === 'month') {
+                        const cx = x + w / 2;
+                        let best = null;
+                        let bestDist = 1e9;
+                        underlines.forEach(line => {
+                            if (line.y < y + h * 0.35 || line.y > y + h + 3) return;
+                            if (line.cx < x - 8 || line.cx > x + w + 8) return;
+                            const dist = Math.abs(line.cx - cx) + Math.abs(line.y - (y + h - 4)) * 0.35;
+                            if (dist < bestDist) { bestDist = dist; best = line; }
+                        });
+                        if (!best) return;
+                        const seat = {
+                            baseline: best.y - 2,
+                            center: best.cx,
+                            ruleW: Math.max(8, best.x1 - best.x0),
+                            ruleY: best.y
+                        };
+                        seats[cell.dataset.id] = seat;
+                        monthSeats.push({ id: cell.dataset.id, text: cell.textContent.trim(), seat: seat });
+                        return;
+                    }
+                    const rec = read(x * sx, (y - 1) * sy, (x + w) * sx, (y + h + 4) * sy);
+                    if (!rec) return;
+                    const threshold = role === 'date' ? 185 : 140;
+                    const rows = rowsOf(rec, threshold);
+                    const minFrac = role === 'date' ? 0.28 : 0.4;
+                    let bestScore = 0;
+                    let chosen = null;
+                    rows.forEach((row, iy) => {
+                        const cssY = (rec.iy0 + iy) / sy;
+                        if (cssY < y + h * 0.45 || cssY > y + h + 2) return;
+                        if (row.best < rec.w * minFrac) return;
+                        const neighbor = Math.max(iy >= 3 ? rows[iy - 3].best : 0, iy + 3 < rows.length ? rows[iy + 3].best : 0);
+                        const score = row.best - neighbor;
+                        if (score > bestScore) { bestScore = score; chosen = row; }
+                    });
+                    if (!chosen) return;
+                    const ruleY = (rec.iy0 + chosen.iy + 0.5) / sy;
+                    const ruleX0 = (rec.ix0 + chosen.a) / sx;
+                    const ruleX1 = (rec.ix0 + chosen.b + 1) / sx;
+                    seats[cell.dataset.id] = {
+                        baseline: ruleY - 2,
+                        center: (ruleX0 + ruleX1) / 2,
+                        ruleW: Math.max(8, ruleX1 - ruleX0),
+                        ruleY: ruleY
+                    };
+                });
+            });
+            let sharedPx = 9;
+            monthSeats.forEach(item => {
+                const fitted = fitPx(item.text, Math.max(12, item.seat.ruleW - 4), 18, 9, 700);
+                if (fitted < sharedPx) sharedPx = fitted;
+            });
+            monthSeats.forEach(item => { item.seat.px = sharedPx; });
+            return seats;
+        }
+
+        function daysInHebrewMonth(year, monthName) {
+            try {
+                const first = new HDate(1, monthName, parseInt(year, 10));
+                const name = first.getMonthName();
+                const y = first.getFullYear();
+                let count = 1;
+                let cursor = first;
+                while (count < 31) {
+                    const next = cursor.next();
+                    if (next.getFullYear() !== y || next.getMonthName() !== name) break;
+                    count += 1;
+                    cursor = next;
+                }
+                return count;
+            } catch (err) {
+                return 29;
+            }
+        }
+
+        function loadHtmlImage(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('image'));
+                img.src = src;
+            });
+        }
+
+        function dedicationFor(templateKey) {
+            if (templateKey === '13') return { before: 'לימוד משניות - הבה״ח', after: 'נ״י' };
+            if (templateKey === 'select') return { before: 'לימוד משניות:', after: '' };
+            return { before: 'לימוד משניות לע״נ', after: 'ז״ל' };
+        }
+
+        function medianGray(data, width, x, y0, y1) {
+            const vals = [];
+            const xx = Math.max(0, Math.min(width - 1, x));
+            for (let y = y0; y < y1; y += 2) vals.push(data[(y * width + xx) * 4]);
+            vals.sort((a, b) => a - b);
+            return vals.length ? vals[vals.length >> 1] : 255;
+        }
+
+        function findVerticalLine(data, width, x0, x1, y0, y1) {
+            let best = Math.round(x0);
+            let bestScore = -Infinity;
+            const start = Math.max(0, Math.round(x0));
+            const end = Math.min(width - 5, Math.round(x1));
+            for (let x = start; x <= end; x++) {
+                const m = medianGray(data, width, x, y0, y1);
+                const mr = medianGray(data, width, x + 4, y0, y1);
+                const score = mr - m;
+                if (m < 150 && score > bestScore) { bestScore = score; best = x; }
+            }
+            return { x: best, score: bestScore };
+        }
+
+        function cropRegion(sourceCanvas, x, y, w, h) {
+            const sx = Math.max(0, Math.round(x));
+            const sy = Math.max(0, Math.round(y));
+            const sw = Math.max(1, Math.round(w));
+            const sh = Math.max(1, Math.round(h));
+            const canvas = document.createElement('canvas');
+            canvas.width = sw;
+            canvas.height = sh;
+            canvas.getContext('2d').drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+            return canvas.toDataURL('image/png');
+        }
+
+        async function buildStructuredSchedule(opts) {
+            const pagesById = {};
+            opts.pages.forEach(p => { pagesById[p.id] = p; });
+            const prepared = {};
+            async function prepare(pageId) {
+                if (prepared[pageId]) return prepared[pageId];
+                const page = pagesById[pageId];
+                const img = await loadHtmlImage(page.image);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const pack = { canvas: canvas, data: imageData.data, width: canvas.width, height: canvas.height, scale: canvas.width / PAGE_CSS_WIDTH };
+                prepared[pageId] = pack;
+                return pack;
+            }
+
+            const groups = new Map();
+            opts.dateCells.forEach(cell => {
+                if (!groups.has(cell.group)) groups.set(cell.group, []);
+                groups.get(cell.group).push(cell);
+            });
+            const monthByGroup = {};
+            opts.monthCells.forEach(cell => { monthByGroup[cell.group] = opts.data[cell.key] || ''; });
+
+            const columns = [];
+            groups.forEach((cells, group) => {
+                const sample = cells[0];
+                columns.push({ group: group, cells: cells, sample: sample, month: monthByGroup[group] || '' });
+            });
+            columns.sort((a, b) => a.group - b.group);
+
+            const pageBuckets = [];
+            for (let i = 0; i < columns.length; i++) {
+                const col = columns[i];
+                const pack = await prepare(col.sample.pageId);
+                const scale = pack.scale;
+                const top = col.sample.tY * scale;
+                const height = col.sample.tH * scale;
+                const rows = col.sample.tRows;
+                const y0 = Math.max(0, Math.round(top) + 4);
+                const y1 = Math.min(pack.height, Math.round(top + height) - 4);
+                const expected = col.sample.tX * scale;
+                let dateLine = findVerticalLine(pack.data, pack.width, expected - 8, expected + 8, y0, y1);
+                if (dateLine.score < 20) dateLine = { x: Math.round(expected), score: 0 };
+                let mid = findVerticalLine(pack.data, pack.width, dateLine.x - 168, dateLine.x - 130, y0, y1);
+                if (mid.score < 20) mid = { x: dateLine.x - 153, score: 0 };
+                let left = findVerticalLine(pack.data, pack.width, mid.x - 168, mid.x - 130, y0, y1);
+                if (left.score < 20) left = { x: dateLine.x - 301, score: 0 };
+
+                const fromX = mid.x + 2;
+                const fromW = dateLine.x - mid.x - 3;
+                const toX = left.x + 2;
+                const toW = mid.x - left.x - 3;
+                const rowH = height / rows;
+                const dates = new Array(rows).fill('');
+                col.cells.forEach(cell => { dates[cell.r] = opts.data[cell.key] || ''; });
+                const fromSrc = new Array(rows);
+                const toSrc = new Array(rows);
+                for (let r = 0; r < rows; r++) {
+                    const y = top + r * rowH + 2;
+                    const h = Math.max(1, rowH - 3);
+                    fromSrc[r] = cropRegion(pack.canvas, fromX, y, fromW, h);
+                    toSrc[r] = cropRegion(pack.canvas, toX, y, toW, h);
+                }
+                const footerSrc = cropRegion(pack.canvas, pack.width * 0.02, pack.height * 0.905, pack.width * 0.96, pack.height * 0.085);
+                const entry = { month: col.month, dates: dates, fromSrc: fromSrc, toSrc: toSrc, pageId: col.sample.pageId, footerSrc: footerSrc };
+                const last = pageBuckets[pageBuckets.length - 1];
+                if (!last || last.pageId !== col.sample.pageId) pageBuckets.push({ pageId: col.sample.pageId, footerSrc: footerSrc, columns: [entry] });
+                else last.columns.push(entry);
+            }
+
+            return {
+                startText: opts.startText,
+                endText: opts.endText,
+                name: opts.name || '',
+                mode: opts.mode,
+                dedication: dedicationFor(opts.templateKey),
+                pages: pageBuckets
+            };
+        }
+
         const App = () => {
             const [pages, setPages] = useState([]);
             const [appMode, setAppMode] = useState('initial-loading');
+            const [seats, setSeats] = useState({});
             const [isProcessing, setIsProcessing] = useState(false);
             const [processingMsg, setProcessingMsg] = useState("");
             const [data, setData] = useState({});
@@ -472,7 +1049,10 @@
             const [newTableConfig, setNewTableConfig] = useState({ rows: 30, cols: 4 });
 
             const [deceasedName, setDeceasedName] = useState("");
-            const [wizardCalcMode, setWizardCalcMode] = useState('backward'); 
+            const [wizardCalcMode, setWizardCalcMode] = useState('backward');
+            const [templateKey, setTemplateKey] = useState('info');
+            const [logoSrc, setLogoSrc] = useState('logo.png');
+            const [schedule, setSchedule] = useState(null); 
             const today = new HDate();
             const [selectedYear, setSelectedYear] = useState(today.getFullYear());
             const [selectedMonth, setSelectedMonth] = useState(today.getMonthName());
@@ -492,10 +1072,14 @@
 
                 const tryLoadTemplate = async () => {
                     const filename = templateId ? `${templateId}.json` : 'info.json';
+                    setTemplateKey(templateId || 'info');
                     try {
-                        const response = await fetch(filename);
-                        if (!response.ok) throw new Error("Template not found");
-                        const json = await response.json();
+                        const loaded = await fetchAsset(filename);
+                        const json = await loaded.response.json();
+                        try {
+                            const logo = await fetchAsset('logo.png');
+                            setLogoSrc(logo.url);
+                        } catch (logoErr) { /* wizard still works without the logo */ }
                         loadJson(json);
                         proceed();
                     } catch (err) {
@@ -535,7 +1119,9 @@
                     setCellStyles(json.styles || {});
                     if (json.meta) {
                         setTemplateMeta(prev => ({ ...prev, ...json.meta }));
-                        setWizardCalcMode(json.meta.calcMethod || 'backward');
+                        const type = json.meta.calcMethodType;
+                        const mode = type === 'fixed-forward' ? 'forward' : (type === 'user-selectable' && json.meta.calcMethod === 'forward' ? 'forward' : 'backward');
+                        setWizardCalcMode(mode);
                     }
                 } else if (json.bgImage && json.tables) { 
                     setPages([{ id: uid(), pageNumber: 1, image: json.bgImage, tables: json.tables }]); 
@@ -568,14 +1154,31 @@
             const isLeap = useMemo(() => { try { return HDate.isLeapYear(parseInt(selectedYear)); } catch(e) { return false; } }, [selectedYear]);
             const availableMonths = useMemo(() => { return [ "Tishrei", "Cheshvan", "Kislev", "Tevet", "Sh'vat", ...(isLeap ? ["Adar I", "Adar II"] : ["Adar"]), "Nisan", "Iyar", "Sivan", "Tamuz", "Av", "Elul" ]; }, [isLeap]);
             useEffect(() => { if (!availableMonths.includes(selectedMonth)) { if (selectedMonth.includes("Adar")) setSelectedMonth(isLeap ? "Adar II" : "Adar"); else setSelectedMonth(availableMonths[0]); } }, [selectedYear, isLeap, availableMonths]);
+            const monthLength = useMemo(() => daysInHebrewMonth(selectedYear, selectedMonth), [selectedYear, selectedMonth]);
+            useEffect(() => { if (parseInt(selectedDay, 10) > monthLength) setSelectedDay(monthLength); }, [monthLength, selectedDay]);
+            useEffect(() => {
+                if (appMode !== 'preview') return undefined;
+                let alive = true;
+                const place = () => { if (alive) setSeats(seatOnRules()); };
+                const frame = requestAnimationFrame(() => requestAnimationFrame(place));
+                return () => { alive = false; cancelAnimationFrame(frame); };
+            }, [appMode, data, pages]);
             const years = Array.from({length: 20}, (_, i) => today.getFullYear() - 5 + i);
             const formatHNum = (n) => { const map = {1:'א',2:'ב',3:'ג',4:'ד',5:'ה',6:'ו',7:'ז',8:'ח',9:'ט',10:'י',11:'יא',12:'יב',13:'יג',14:'יד',15:'טו',16:'טז',17:'יז',18:'יח',19:'יט',20:'כ',21:'כא',22:'כב',23:'כג',24:'כד',25:'כה',26:'כו',27:'כז',28:'כח',29:'כט',30:'ל'}; return map[n] || n; };
             const monthHebrewDisplay = { "Nisan": "ניסן", "Iyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול", "Tishrei": "תשרי", "Cheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", "Sh'vat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'" };
             const getYearStr = (y) => { if (typeof gematriya === 'function') return gematriya(y); try { return new HDate(1, "Tishrei", y).render('he').split(' ').pop().replace('הת',''); } catch(e) { return y; } };
 
-            const handleWizardSubmit = () => {
+            const handleWizardSubmit = async () => {
                  try {
-                    const selectedDate = new HDate(parseInt(selectedDay), selectedMonth, parseInt(selectedYear));
+                    const yearNum = parseInt(selectedYear, 10);
+                    const maxDay = daysInHebrewMonth(yearNum, selectedMonth);
+                    const dayNum = Math.min(parseInt(selectedDay, 10) || 1, maxDay);
+                    const selectedDate = new HDate(dayNum, selectedMonth, yearNum);
+                    const monthAnchor = new HDate(1, selectedMonth, yearNum);
+                    if (selectedDate.getDate() !== dayNum || selectedDate.getMonthName() !== monthAnchor.getMonthName() || selectedDate.getFullYear() !== monthAnchor.getFullYear()) {
+                        alert("התאריך שנבחר אינו קיים בלוח העברי");
+                        return;
+                    }
                     const newData = { ...data };
                     const newStyles = { ...cellStyles };
                     const stylesMap = { 
@@ -588,10 +1191,10 @@
                     const findCells = (pattern) => { const matches = []; Object.entries(newData).forEach(([key, val]) => { if (String(val).match(pattern)) matches.push({ key, val }); }); return matches; };
                     findCells(/\{\{Name of the deceased\}\}/i).forEach(item => { newData[item.key] = deceasedName; newStyles[item.key] = stylesMap.name; });
                     let dateCells = []; const monthCells = []; const cellMeta = {};
-                    pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; const val = newData[key]; cellMeta[key] = { pIdx, tY: t.y, r, c }; if (val) { const dMatch = String(val).match(/\{\{date(\d+)\}\}/i); if (dMatch) dateCells.push({ key, group: parseInt(dMatch[1]), ...cellMeta[key] }); const mMatch = String(val).match(/\{\{month(\d+)\}\}/i); if (mMatch) monthCells.push({ key, group: parseInt(mMatch[1]) }); } } } }); });
+                    pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; const val = newData[key]; cellMeta[key] = { pIdx, tY: t.y, r, c, tX: t.x, tW: t.w, tH: t.h, tRows: t.rows, pageId: p.id }; if (val) { const dMatch = String(val).match(/\{\{date(\d+)\}\}/i); if (dMatch) dateCells.push({ key, group: parseInt(dMatch[1]), ...cellMeta[key] }); const mMatch = String(val).match(/\{\{month(\d+)\}\}/i); if (mMatch) monthCells.push({ key, group: parseInt(mMatch[1]) }); } } } }); });
                     if (dateCells.length === 0) {
                         const allPotential = [];
-                        pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; if (!String(newData[key] || "").match(/\{\{Name|\{\{month/i)) allPotential.push({ key, pIdx, tY: t.y, r, c }); } } }); });
+                        pages.forEach((p, pIdx) => { p.tables.forEach(t => { for(let r=0; r<t.rows; r++) { for(let c=0; c<t.cols; c++) { const key = `${t.id}_${r}_${c}`; if (!String(newData[key] || "").match(/\{\{Name|\{\{month/i)) allPotential.push({ key, pIdx, tY: t.y, r, c, tX: t.x, tW: t.w, tH: t.h, tRows: t.rows, pageId: p.id }); } } }); });
                         allPotential.sort((a, b) => { if (a.pIdx !== b.pIdx) return a.pIdx - b.pIdx; if (Math.abs(a.tY - b.tY) > 10) return a.tY - b.tY; if (a.r !== b.r) return a.r - b.r; return b.c - a.c; });
                         dateCells = allPotential.map((c, idx) => ({ ...c, group: idx + 1 }));
                     } else {
@@ -601,7 +1204,7 @@
                     let runningDate = selectedDate; 
                     let startDate, endDate;
                     const groupMonths = {}; 
-                    const effectiveCalcMethod = templateMeta.calcMethodType === 'user-selectable' ? wizardCalcMode : (templateMeta.calcMethodType === 'fixed-forward' ? 'forward' : 'backward');
+                    const effectiveCalcMethod = wizardCalcMode === 'forward' ? 'forward' : 'backward';
                     if (effectiveCalcMethod === 'forward') {
                         startDate = selectedDate;
                         for (let i = 0; i < dateCells.length; i++) {
@@ -681,6 +1284,65 @@
             };
 
             const saveTemplate = () => { const template = { version: 2, pages, data, styles: cellStyles, meta: templateMeta }; const blob = new Blob([JSON.stringify(template)], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "template.json"; a.click(); };
+
+            const downloadPdf = async () => {
+                if (!window.PDFLib) { alert("לא ניתן להוריד את הקובץ כרגע"); return; }
+                setIsProcessing(true);
+                setProcessingMsg("מכין קובץ PDF...");
+                const wraps = [...document.querySelectorAll('.page-wrapper')];
+                const previous = wraps.map(wrap => wrap.style.transform);
+                try {
+                    wraps.forEach(wrap => { wrap.style.transform = 'none'; });
+                    const { PDFDocument } = window.PDFLib;
+                    const pdf = await PDFDocument.create();
+                    for (const wrap of wraps) {
+                        const pageEl = wrap.querySelector('.page-container');
+                        const img = pageEl.querySelector('img.pdf-bg-img');
+                        const width = pageEl.offsetWidth;
+                        const height = pageEl.offsetHeight;
+                        const scale = 2;
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(width * scale);
+                        canvas.height = Math.round(height * scale);
+                        const ctx = canvas.getContext('2d');
+                        ctx.scale(scale, scale);
+                        ctx.drawImage(img, 0, 0, width, height);
+                        ctx.fillStyle = '#111111';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'alphabetic';
+                        const origin = pageEl.getBoundingClientRect();
+                        pageEl.querySelectorAll('.slot-cell').forEach(cell => {
+                            const text = (cell.textContent || '').trim();
+                            if (!text) return;
+                            const span = cell.querySelector('span') || cell;
+                            const font = getComputedStyle(span);
+                            const box = span.getBoundingClientRect();
+                            const px = parseFloat(font.fontSize) || 8;
+                            ctx.font = font.fontWeight + ' ' + font.fontSize + ' ' + font.fontFamily;
+                            const cx = (box.left - origin.left) + box.width / 2;
+                            const baseline = (box.top - origin.top) + px * INK_BOTTOM;
+                            ctx.fillText(text, cx, baseline);
+                        });
+                        const bytes = await fetch(canvas.toDataURL('image/jpeg', 0.92)).then(res => res.arrayBuffer());
+                        const embedded = await pdf.embedJpg(bytes);
+                        const sheet = pdf.addPage([595.28, 841.89]);
+                        sheet.drawImage(embedded, { x: 0, y: 0, width: 595.28, height: 841.89 });
+                    }
+                    const saved = await pdf.save();
+                    const blob = new Blob([saved], { type: 'application/pdf' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'לוח-לימוד.pdf';
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                } catch (err) {
+                    console.error(err);
+                    alert("שגיאה ביצירת הקובץ");
+                } finally {
+                    wraps.forEach((wrap, index) => { wrap.style.transform = previous[index]; });
+                    setIsProcessing(false);
+                }
+            };
             const deleteTable = (pageId, tableId) => { if (confirm("למחוק טבלה?")) setPages(prev => prev.map(p => p.id !== pageId ? p : { ...p, tables: p.tables.filter(t => t.id !== tableId) })); };
             const confirmTable = () => { if (!pendingTable) return; setPages(prev => prev.map(p => p.id !== pendingTable.pageId ? p : { ...p, tables: [...p.tables, { id: uid(), x: pendingTable.x, y: pendingTable.y, w: pendingTable.w, h: pendingTable.h, rows: parseInt(newTableConfig.rows) || 30, cols: parseInt(newTableConfig.cols) || 4 }] })); setPendingTable(null); };
 
@@ -704,27 +1366,32 @@
                     <div className="hero-overlay">
                         <div className="glass-card fade-in">
                             <div className="logo-header">
-                                <img src="logo.png" alt="דף היומי במשניות" className="logo-img mx-auto" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block'; }} />
+                                <img src={logoSrc} alt="דף היומי במשניות" className="logo-img mx-auto" onError={(e) => { if (!e.target.dataset.fb) { e.target.dataset.fb = '1'; e.target.src = '../logo.png'; } else { e.target.style.display='none'; e.target.nextSibling.style.display='block'; } }} />
                                 <div style={{display:'none'}} className="title-serif text-3xl font-bold text-white">דף היומי במשניות</div>
                             </div>
                             <div className="card-content">
                                 <h1 className="text-2xl font-bold title-serif mb-6">{templateMeta.wizardTitles.main}</h1>
                                 <div className="space-y-4">
                                     <div className="input-wrapper">
-                                        <label className="input-label">{templateMeta.wizardTitles.dateLabel}</label>
+                                        <label className="input-label">{templateMeta.calcMethodType === 'user-selectable' ? templateMeta.wizardTitles.dateLabel : (wizardCalcMode === 'forward' ? 'תאריך התחלה' : templateMeta.wizardTitles.dateLabel)}</label>
                                         <div className="flex gap-2 flex-col sm:flex-row">
-                                            <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
+                                            <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: monthLength}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
                                             <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">{availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}</select>
                                             <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">{years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}</select>
                                         </div>
                                     </div>
-                                    {templateMeta.calcMethodType === 'user-selectable' && (
+                                    {templateMeta.calcMethodType === 'user-selectable' ? (
                                         <div className="input-wrapper">
                                             <label className="input-label">חישוב לוח לימוד</label>
                                             <div className="calc-toggle">
                                                 <div className={`calc-option ${wizardCalcMode === 'forward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</div>
                                                 <div className={`calc-option ${wizardCalcMode === 'backward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</div>
                                             </div>
+                                        </div>
+                                    ) : (
+                                        <div className="mode-quiet">
+                                            <button type="button" className={wizardCalcMode === 'backward' ? 'on' : ''} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</button>
+                                            <button type="button" className={wizardCalcMode === 'forward' ? 'on' : ''} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</button>
                                         </div>
                                     )}
                                     {templateMeta.showNameField && (
@@ -770,7 +1437,44 @@
                                     <img src={page.image} className="pdf-bg-img" alt={`Page ${pIdx+1}`} />
                                     <div className={`interaction-layer ${appMode === 'editor' ? 'edit-mode' : 'view-mode'}`}>
                                         {page.tables.map(t => {
-                                            const cW = t.w / t.cols, cH = t.h / t.rows;
+                                            const slot = (() => {
+                                                const head = cellStyles[`${t.id}_0_0`] || {};
+                                                if (!(appMode === 'preview' && t.rows === 1 && head.fontSize === '9px')) return t;
+                                                const dates = page.tables.filter(d => d.rows >= 20 && d.x + 2 >= t.x && d.y > t.y - 8 && d.y < t.y + 55);
+                                                dates.sort((a, b) => a.x - b.x);
+                                                const col = dates[0];
+                                                if (!col) return t;
+                                                const center = col.x - 100.5;
+                                                const w = Math.max(t.w, 104);
+                                                return { ...t, x: center - w / 2, w };
+                                            })();
+                                            const cW = slot.w / slot.cols, cH = slot.h / slot.rows;
+                                            if (appMode === 'preview') {
+                                                return (
+                                                    <div key={t.id} className="slot-grid" style={{ left: `${slot.x}px`, top: `${slot.y}px`, width: `${slot.w}px`, height: `${slot.h}px`, gridTemplateColumns: `repeat(${slot.cols}, 1fr)`, gridTemplateRows: `repeat(${slot.rows}, 1fr)` }}>
+                                                        {Array.from({length: t.rows}).map((_, r) => Array.from({length: t.cols}).map((_, c) => {
+                                                            const id = `${t.id}_${r}_${c}`;
+                                                            const text = data[id] || "";
+                                                            const style = cellStyles[id] || {};
+                                                            const weight = style.fontWeight || 700;
+                                                            const maxPx = parseFloat(style.fontSize) || 8;
+                                                            const role = style.fontSize === '7.5px' ? 'date' : style.fontSize === '9px' ? 'month' : style.fontSize === '11px' ? 'range' : style.fontSize === '13px' ? 'name' : '';
+                                                            const seat = seats[id];
+                                                            const cap = role === 'date' ? 6.25 : maxPx;
+                                                            const fitWidth = seat && role !== 'date' && role !== 'month' ? Math.min(cW, seat.ruleW - 4) : cW;
+                                                            const px = role === 'month' && seat && seat.px ? seat.px : fitPx(text, fitWidth, cH, cap, role === 'date' ? 600 : weight);
+                                                            const usedWeight = role === 'date' ? 600 : weight;
+                                                            const width = textWidth(text, px, usedWeight);
+                                                            const cellX = slot.x + c * cW;
+                                                            const cellY = slot.y + r * cH;
+                                                            const onRule = seat && role !== 'date';
+                                                            const left = onRule ? seat.center - cellX - width / 2 : (cW - width) / 2;
+                                                            const top = onRule ? seat.baseline - cellY - px * INK_BOTTOM : (cH - (role === 'date' ? 1.9 : 2.6) - px * INK_BOTTOM);
+                                                            return <div key={id} className="slot-cell" data-id={id} data-role={role || undefined} data-date={role === 'date' ? text : undefined} style={{ fontWeight: usedWeight }}><span style={{ fontSize: px + 'px', fontWeight: usedWeight, left: left + 'px', top: top + 'px' }}>{text}</span></div>;
+                                                        }))}
+                                                    </div>
+                                                );
+                                            }
                                             return (
                                                 <div key={t.id} className="grid-container" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` }}>
                                                     {appMode === 'editor' && (
@@ -781,7 +1485,7 @@
                                                     )}
                                                     {Array.from({length: t.rows}).map((_, r) => Array.from({length: t.cols}).map((_, c) => {
                                                         const id = `${t.id}_${r}_${c}`;
-                                                        return <input key={id} className="cell-input" style={{ right: `${c * cW}px`, top: `${r * cH}px`, width: `${cW}px`, height: `${cH}px`, ...(cellStyles[id] || {}), pointerEvents: appMode === 'preview' ? 'none' : 'auto' }} readOnly={appMode === 'preview'} value={data[id] || ""} onChange={(e) => setData({...data, [id]: e.target.value})} autoComplete="off" />;
+                                                        return <input key={id} className="cell-input" style={{ right: `${c * cW}px`, top: `${r * cH}px`, width: `${cW}px`, height: `${cH}px`, ...(cellStyles[id] || {}) }} value={data[id] || ""} onChange={(e) => setData({...data, [id]: e.target.value})} autoComplete="off" />;
                                                     }))}
                                                 </div>
                                             );
@@ -795,10 +1499,10 @@
                         ))}
                     </div>
                     {appMode === 'preview' && (
-                        <div className="floating-toolbar">
-                            <button onClick={() => window.print()} className="btn btn-primary"><Icon name="Printer" /> הדפס / שמור כ-PDF</button>
-                            <div className="w-px bg-slate-200 mx-1"></div>
-                            <button onClick={() => window.location.reload()} className="btn btn-outline"><Icon name="RotateCcw" /> חזרה</button>
+                        <div className="action-bar no-print">
+                            <button type="button" className="act-back" onClick={() => setAppMode('wizard')}>חזרה</button>
+                            <button type="button" className="act-download" onClick={downloadPdf}>הורדה</button>
+                            <button type="button" className="act-print" onClick={() => window.print()}>הדפסה</button>
                         </div>
                     )}
                     {showSettings && (
