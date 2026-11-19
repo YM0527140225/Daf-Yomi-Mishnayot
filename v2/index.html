@@ -30,6 +30,7 @@
 
     <!-- Hebcal (Hebrew Dates) -->
     <script src="https://cdn.jsdelivr.net/npm/@hebcal/core@5.3.0/dist/bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -201,7 +202,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 2rem;
+        padding: 2rem 2rem 96px;
         gap: 2rem;
         min-height: calc(100vh - 70px);
         overflow: auto;
@@ -298,20 +299,74 @@
       .edit-mode .cell-input { border: 1px solid rgba(0,0,0,0.05); pointer-events: none; }
       .view-mode .cell-input { pointer-events: auto; }
 
-      .floating-toolbar {
+      .action-bar {
         position: fixed;
-        bottom: 2rem;
-        left: 50%;
-        transform: translateX(-50%);
-        background: white;
-        padding: 0.75rem 1.5rem;
-        border-radius: 50px;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        z-index: 60;
+        left: 0;
+        right: 0;
+        bottom: 0;
         display: flex;
+        gap: 8px;
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+        background: #fff;
+        border-top: 1px solid #e2e8f0;
+        box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08);
+      }
+      .action-bar button {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 44px;
+        padding: 0 8px;
+        border-radius: 12px;
+        font-family: 'Assistant', sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        line-height: 1;
+      }
+      .action-bar .act-back,
+      .action-bar .act-download {
+        background: #fff;
+        color: var(--primary-green);
+        border: 1px solid #c5d0cb;
+      }
+      .action-bar .act-print {
+        background: var(--accent-gold);
+        color: var(--primary-green);
+        border: 1px solid var(--accent-gold);
+      }
+      @media (min-width: 720px) {
+        .action-bar {
+          left: 50%;
+          right: auto;
+          bottom: 16px;
+          transform: translateX(-50%);
+          width: 480px;
+          border: 1px solid #e2e8f0;
+          border-radius: 16px;
+        }
+      }
+      .mode-quiet {
+        display: flex;
+        justify-content: center;
         gap: 1rem;
-        z-index: 50;
-        border: 1px solid #e2e8f0;
-        animation: slideUp 0.5s ease-out;
+        margin: -0.15rem 0 0.15rem;
+      }
+      .mode-quiet button {
+        background: none;
+        border: none;
+        padding: 2px 0;
+        cursor: pointer;
+        color: rgba(255,255,255,0.72);
+        font-family: 'Assistant', sans-serif;
+        font-size: 0.82rem;
+        font-weight: 600;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      .mode-quiet button.on {
+        color: var(--accent-gold);
+        font-weight: 800;
       }
       
       .btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 999px; font-weight: 600; transition: all 0.2s; cursor: pointer; font-size: 0.95rem; border: none; }
@@ -378,7 +433,7 @@
           left: 0 !important;
         }
 
-        .hero-overlay, .floating-toolbar, .toolbar, .action-btn-group, .popover, .no-print, .btn, .mini-btn { 
+        .hero-overlay, .floating-toolbar, .action-bar, .toolbar, .action-btn-group, .popover, .no-print, .btn, .mini-btn { 
           display: none !important; 
         }
 
@@ -431,32 +486,42 @@
       .slot-grid {
         position: absolute;
         display: grid;
-        direction: rtl;
+        direction: ltr;
         background: transparent;
         z-index: 2;
         pointer-events: none;
+        margin: 0;
+        padding: 0;
       }
       .slot-cell {
-        background: transparent;
+        display: grid;
+        place-items: center;
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
         border: none;
+        background: transparent;
         box-shadow: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         overflow: hidden;
         min-width: 0;
         min-height: 0;
-        padding: 0 1px;
         color: #111;
         font-family: 'Assistant', sans-serif;
         line-height: 1;
+        text-align: center;
       }
       .slot-cell > span {
         display: block;
-        max-width: 100%;
+        margin: 0;
+        padding: 0;
+        line-height: 1;
         white-space: nowrap;
         text-align: center;
+        direction: rtl;
         background: transparent;
+        border: none;
       }
 
       /* Structured schedule: real cells, not text laid over a background. */
@@ -650,6 +715,25 @@
                 px -= 0.25;
             }
             return 4;
+        }
+
+        function daysInHebrewMonth(year, monthName) {
+            try {
+                const first = new HDate(1, monthName, parseInt(year, 10));
+                const name = first.getMonthName();
+                const y = first.getFullYear();
+                let count = 1;
+                let cursor = first;
+                while (count < 31) {
+                    const next = cursor.next();
+                    if (next.getFullYear() !== y || next.getMonthName() !== name) break;
+                    count += 1;
+                    cursor = next;
+                }
+                return count;
+            } catch (err) {
+                return 29;
+            }
         }
 
         function loadHtmlImage(src) {
@@ -919,6 +1003,8 @@
             const isLeap = useMemo(() => { try { return HDate.isLeapYear(parseInt(selectedYear)); } catch(e) { return false; } }, [selectedYear]);
             const availableMonths = useMemo(() => { return [ "Tishrei", "Cheshvan", "Kislev", "Tevet", "Sh'vat", ...(isLeap ? ["Adar I", "Adar II"] : ["Adar"]), "Nisan", "Iyar", "Sivan", "Tamuz", "Av", "Elul" ]; }, [isLeap]);
             useEffect(() => { if (!availableMonths.includes(selectedMonth)) { if (selectedMonth.includes("Adar")) setSelectedMonth(isLeap ? "Adar II" : "Adar"); else setSelectedMonth(availableMonths[0]); } }, [selectedYear, isLeap, availableMonths]);
+            const monthLength = useMemo(() => daysInHebrewMonth(selectedYear, selectedMonth), [selectedYear, selectedMonth]);
+            useEffect(() => { if (parseInt(selectedDay, 10) > monthLength) setSelectedDay(monthLength); }, [monthLength, selectedDay]);
             const years = Array.from({length: 20}, (_, i) => today.getFullYear() - 5 + i);
             const formatHNum = (n) => { const map = {1:'א',2:'ב',3:'ג',4:'ד',5:'ה',6:'ו',7:'ז',8:'ח',9:'ט',10:'י',11:'יא',12:'יב',13:'יג',14:'יד',15:'טו',16:'טז',17:'יז',18:'יח',19:'יט',20:'כ',21:'כא',22:'כב',23:'כג',24:'כד',25:'כה',26:'כו',27:'כז',28:'כח',29:'כט',30:'ל'}; return map[n] || n; };
             const monthHebrewDisplay = { "Nisan": "ניסן", "Iyar": "אייר", "Sivan": "סיוון", "Tamuz": "תמוז", "Av": "אב", "Elul": "אלול", "Tishrei": "תשרי", "Cheshvan": "חשוון", "Kislev": "כסלו", "Tevet": "טבת", "Sh'vat": "שבט", "Adar": "אדר", "Adar I": "אדר א'", "Adar II": "אדר ב'" };
@@ -926,7 +1012,15 @@
 
             const handleWizardSubmit = async () => {
                  try {
-                    const selectedDate = new HDate(parseInt(selectedDay), selectedMonth, parseInt(selectedYear));
+                    const yearNum = parseInt(selectedYear, 10);
+                    const maxDay = daysInHebrewMonth(yearNum, selectedMonth);
+                    const dayNum = Math.min(parseInt(selectedDay, 10) || 1, maxDay);
+                    const selectedDate = new HDate(dayNum, selectedMonth, yearNum);
+                    const monthAnchor = new HDate(1, selectedMonth, yearNum);
+                    if (selectedDate.getDate() !== dayNum || selectedDate.getMonthName() !== monthAnchor.getMonthName() || selectedDate.getFullYear() !== monthAnchor.getFullYear()) {
+                        alert("התאריך שנבחר אינו קיים בלוח העברי");
+                        return;
+                    }
                     const newData = { ...data };
                     const newStyles = { ...cellStyles };
                     const stylesMap = { 
@@ -1032,6 +1126,62 @@
             };
 
             const saveTemplate = () => { const template = { version: 2, pages, data, styles: cellStyles, meta: templateMeta }; const blob = new Blob([JSON.stringify(template)], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "template.json"; a.click(); };
+
+            const downloadPdf = async () => {
+                if (!window.PDFLib) { alert("לא ניתן להוריד את הקובץ כרגע"); return; }
+                setIsProcessing(true);
+                setProcessingMsg("מכין קובץ PDF...");
+                const wraps = [...document.querySelectorAll('.page-wrapper')];
+                const previous = wraps.map(wrap => wrap.style.transform);
+                try {
+                    wraps.forEach(wrap => { wrap.style.transform = 'none'; });
+                    const { PDFDocument } = window.PDFLib;
+                    const pdf = await PDFDocument.create();
+                    for (const wrap of wraps) {
+                        const pageEl = wrap.querySelector('.page-container');
+                        const img = pageEl.querySelector('img.pdf-bg-img');
+                        const width = pageEl.offsetWidth;
+                        const height = pageEl.offsetHeight;
+                        const scale = 2;
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(width * scale);
+                        canvas.height = Math.round(height * scale);
+                        const ctx = canvas.getContext('2d');
+                        ctx.scale(scale, scale);
+                        ctx.drawImage(img, 0, 0, width, height);
+                        ctx.fillStyle = '#111111';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        const origin = pageEl.getBoundingClientRect();
+                        pageEl.querySelectorAll('.slot-cell').forEach(cell => {
+                            const text = (cell.textContent || '').trim();
+                            if (!text) return;
+                            const span = cell.querySelector('span') || cell;
+                            const font = getComputedStyle(span);
+                            const box = cell.getBoundingClientRect();
+                            ctx.font = font.fontWeight + ' ' + font.fontSize + ' ' + font.fontFamily;
+                            ctx.fillText(text, (box.left - origin.left) + box.width / 2, (box.top - origin.top) + box.height / 2);
+                        });
+                        const bytes = await fetch(canvas.toDataURL('image/jpeg', 0.92)).then(res => res.arrayBuffer());
+                        const embedded = await pdf.embedJpg(bytes);
+                        const sheet = pdf.addPage([595.28, 841.89]);
+                        sheet.drawImage(embedded, { x: 0, y: 0, width: 595.28, height: 841.89 });
+                    }
+                    const saved = await pdf.save();
+                    const blob = new Blob([saved], { type: 'application/pdf' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'לוח-לימוד.pdf';
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                } catch (err) {
+                    console.error(err);
+                    alert("שגיאה ביצירת הקובץ");
+                } finally {
+                    wraps.forEach((wrap, index) => { wrap.style.transform = previous[index]; });
+                    setIsProcessing(false);
+                }
+            };
             const deleteTable = (pageId, tableId) => { if (confirm("למחוק טבלה?")) setPages(prev => prev.map(p => p.id !== pageId ? p : { ...p, tables: p.tables.filter(t => t.id !== tableId) })); };
             const confirmTable = () => { if (!pendingTable) return; setPages(prev => prev.map(p => p.id !== pendingTable.pageId ? p : { ...p, tables: [...p.tables, { id: uid(), x: pendingTable.x, y: pendingTable.y, w: pendingTable.w, h: pendingTable.h, rows: parseInt(newTableConfig.rows) || 30, cols: parseInt(newTableConfig.cols) || 4 }] })); setPendingTable(null); };
 
@@ -1062,28 +1212,27 @@
                                 <h1 className="text-2xl font-bold title-serif mb-6">{templateMeta.wizardTitles.main}</h1>
                                 <div className="space-y-4">
                                     <div className="input-wrapper">
-                                        <label className="input-label">סוג לוח</label>
-                                        <div className="calc-toggle">
-                                            <a className={`calc-option ${templateKey === 'info' ? 'active' : ''}`} href={window.location.pathname}>בית האבל</a>
-                                            <a className={`calc-option ${templateKey === '13' ? 'active' : ''}`} href={window.location.pathname + '?13'}>בר מצווה</a>
-                                            <a className={`calc-option ${templateKey === 'select' ? 'active' : ''}`} href={window.location.pathname + '?select'}>מותאם אישית</a>
-                                        </div>
-                                    </div>
-                                    <div className="input-wrapper">
                                         <label className="input-label">{templateMeta.calcMethodType === 'user-selectable' ? templateMeta.wizardTitles.dateLabel : (wizardCalcMode === 'forward' ? 'תאריך התחלה' : templateMeta.wizardTitles.dateLabel)}</label>
                                         <div className="flex gap-2 flex-col sm:flex-row">
-                                            <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
+                                            <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: monthLength}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
                                             <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">{availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}</select>
                                             <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">{years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}</select>
                                         </div>
                                     </div>
-                                    <div className="input-wrapper">
-                                        <label className="input-label">חישוב לוח לימוד</label>
-                                        <div className="calc-toggle">
-                                            <div className={`calc-option ${wizardCalcMode === 'forward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</div>
-                                            <div className={`calc-option ${wizardCalcMode === 'backward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</div>
+                                    {templateMeta.calcMethodType === 'user-selectable' ? (
+                                        <div className="input-wrapper">
+                                            <label className="input-label">חישוב לוח לימוד</label>
+                                            <div className="calc-toggle">
+                                                <div className={`calc-option ${wizardCalcMode === 'forward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</div>
+                                                <div className={`calc-option ${wizardCalcMode === 'backward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        <div className="mode-quiet">
+                                            <button type="button" className={wizardCalcMode === 'backward' ? 'on' : ''} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</button>
+                                            <button type="button" className={wizardCalcMode === 'forward' ? 'on' : ''} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</button>
+                                        </div>
+                                    )}
                                     {templateMeta.showNameField && (
                                         <div className="input-wrapper">
                                             <label className="input-label">{templateMeta.nameLabel}</label>
@@ -1127,10 +1276,21 @@
                                     <img src={page.image} className="pdf-bg-img" alt={`Page ${pIdx+1}`} />
                                     <div className={`interaction-layer ${appMode === 'editor' ? 'edit-mode' : 'view-mode'}`}>
                                         {page.tables.map(t => {
-                                            const cW = t.w / t.cols, cH = t.h / t.rows;
+                                            const slot = (() => {
+                                                const head = cellStyles[`${t.id}_0_0`] || {};
+                                                if (!(appMode === 'preview' && t.rows === 1 && head.fontSize === '9px')) return t;
+                                                const dates = page.tables.filter(d => d.rows >= 20 && d.x + 2 >= t.x && d.y > t.y - 8 && d.y < t.y + 55);
+                                                dates.sort((a, b) => a.x - b.x);
+                                                const col = dates[0];
+                                                if (!col) return t;
+                                                const center = col.x - 100.5;
+                                                const w = Math.max(t.w, 104);
+                                                return { ...t, x: center - w / 2, w };
+                                            })();
+                                            const cW = slot.w / slot.cols, cH = slot.h / slot.rows;
                                             if (appMode === 'preview') {
                                                 return (
-                                                    <div key={t.id} className="slot-grid" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px`, gridTemplateColumns: `repeat(${t.cols}, 1fr)`, gridTemplateRows: `repeat(${t.rows}, 1fr)` }}>
+                                                    <div key={t.id} className="slot-grid" style={{ left: `${slot.x}px`, top: `${slot.y}px`, width: `${slot.w}px`, height: `${slot.h}px`, gridTemplateColumns: `repeat(${slot.cols}, 1fr)`, gridTemplateRows: `repeat(${slot.rows}, 1fr)` }}>
                                                         {Array.from({length: t.rows}).map((_, r) => Array.from({length: t.cols}).map((_, c) => {
                                                             const id = `${t.id}_${r}_${c}`;
                                                             const text = data[id] || "";
@@ -1168,10 +1328,10 @@
                         ))}
                     </div>
                     {appMode === 'preview' && (
-                        <div className="floating-toolbar">
-                            <button onClick={() => window.print()} className="btn btn-primary"><Icon name="Printer" /> הדפס / שמור כ-PDF</button>
-                            <div className="w-px bg-slate-200 mx-1"></div>
-                            <button onClick={() => window.location.reload()} className="btn btn-outline"><Icon name="RotateCcw" /> חזרה</button>
+                        <div className="action-bar no-print">
+                            <button type="button" className="act-back" onClick={() => setAppMode('wizard')}>חזרה</button>
+                            <button type="button" className="act-download" onClick={downloadPdf}>הורדה</button>
+                            <button type="button" className="act-print" onClick={() => window.print()}>הדפסה</button>
                         </div>
                     )}
                     {showSettings && (
