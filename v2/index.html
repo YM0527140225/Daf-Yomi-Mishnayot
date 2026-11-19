@@ -382,9 +382,10 @@
           display: none !important; 
         }
 
-        .cell-input { 
-          border: none !important; 
-          background: transparent !important; 
+        .cell-input, .slot-grid, .slot-cell, .slot-cell span {
+          border: none !important;
+          background: transparent !important;
+          box-shadow: none !important;
         }
       }
 
@@ -422,6 +423,40 @@
         background: var(--selection-blue);
         pointer-events: none;
         z-index: 100;
+      }
+
+      a.calc-option { text-decoration: none; color: white; }
+      a.calc-option.active { color: var(--primary-green); }
+
+      .slot-grid {
+        position: absolute;
+        display: grid;
+        direction: rtl;
+        background: transparent;
+        z-index: 2;
+        pointer-events: none;
+      }
+      .slot-cell {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        min-width: 0;
+        min-height: 0;
+        padding: 0 1px;
+        color: #111;
+        font-family: 'Assistant', sans-serif;
+        line-height: 1;
+      }
+      .slot-cell > span {
+        display: block;
+        max-width: 100%;
+        white-space: nowrap;
+        text-align: center;
+        background: transparent;
       }
 
       /* Structured schedule: real cells, not text laid over a background. */
@@ -601,6 +636,20 @@
                 } catch (err) { /* try the next location */ }
             }
             throw new Error(filename);
+        }
+
+        let measureCtx = null;
+        function fitPx(text, width, height, maxPx, weight) {
+            const cap = Math.max(4, Math.min(maxPx || 8, (height || 8) * 0.82));
+            if (!text) return cap;
+            if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+            let px = cap;
+            while (px > 4) {
+                measureCtx.font = weight + ' ' + px + 'px Assistant, Arial, sans-serif';
+                if (measureCtx.measureText(text).width <= Math.max(4, width - 2)) return px;
+                px -= 0.25;
+            }
+            return 4;
         }
 
         function loadHtmlImage(src) {
@@ -943,31 +992,8 @@
                     });
                     findCells(/\{\{start\}\}/i).forEach(c => { newData[c.key] = formatFullDate(startDate); newStyles[c.key] = stylesMap.meta; });
                     findCells(/\{\{end\}\}/i).forEach(c => { newData[c.key] = formatFullDate(endDate); newStyles[c.key] = stylesMap.meta; });
-                    const startText = formatFullDate(startDate);
-                    const endText = formatFullDate(endDate);
                     setData(newData); setCellStyles(newStyles);
-                    setIsProcessing(true);
-                    setProcessingMsg("מכין את הלוח...");
                     setAppMode('preview');
-                    try {
-                        const built = await buildStructuredSchedule({
-                            pages: pages,
-                            dateCells: dateCells,
-                            monthCells: monthCells,
-                            data: newData,
-                            startText: startText,
-                            endText: endText,
-                            name: deceasedName,
-                            mode: effectiveCalcMethod,
-                            templateKey: templateKey
-                        });
-                        setSchedule(built);
-                    } catch (buildErr) {
-                        console.error(buildErr);
-                        alert("שגיאה בהכנת הלוח");
-                    } finally {
-                        setIsProcessing(false);
-                    }
                 } catch (e) { console.error(e); alert("שגיאה ביצירת הלוח"); }
             };
 
@@ -1036,18 +1062,26 @@
                                 <h1 className="text-2xl font-bold title-serif mb-6">{templateMeta.wizardTitles.main}</h1>
                                 <div className="space-y-4">
                                     <div className="input-wrapper">
-                                        <label className="input-label">חישוב לוח לימוד</label>
+                                        <label className="input-label">סוג לוח</label>
                                         <div className="calc-toggle">
-                                            <div className={`calc-option ${wizardCalcMode === 'forward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</div>
-                                            <div className={`calc-option ${wizardCalcMode === 'backward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</div>
+                                            <a className={`calc-option ${templateKey === 'info' ? 'active' : ''}`} href={window.location.pathname}>בית האבל</a>
+                                            <a className={`calc-option ${templateKey === '13' ? 'active' : ''}`} href={window.location.pathname + '?13'}>בר מצווה</a>
+                                            <a className={`calc-option ${templateKey === 'select' ? 'active' : ''}`} href={window.location.pathname + '?select'}>מותאם אישית</a>
                                         </div>
                                     </div>
                                     <div className="input-wrapper">
-                                        <label className="input-label">{wizardCalcMode === 'forward' ? 'תאריך התחלה' : 'תאריך יעד'}</label>
+                                        <label className="input-label">{templateMeta.calcMethodType === 'user-selectable' ? templateMeta.wizardTitles.dateLabel : (wizardCalcMode === 'forward' ? 'תאריך התחלה' : templateMeta.wizardTitles.dateLabel)}</label>
                                         <div className="flex gap-2 flex-col sm:flex-row">
                                             <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} className="fancy-input flex-1">{Array.from({length: 30}, (_, i) => i + 1).map(d => <option key={d} value={d}>{formatHNum(d)}</option>)}</select>
                                             <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="fancy-input flex-[1.5]">{availableMonths.map(m => <option key={m} value={m}>{monthHebrewDisplay[m] || m}</option>)}</select>
                                             <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} className="fancy-input flex-1">{years.map(y => <option key={y} value={y}>{getYearStr(y)}</option>)}</select>
+                                        </div>
+                                    </div>
+                                    <div className="input-wrapper">
+                                        <label className="input-label">חישוב לוח לימוד</label>
+                                        <div className="calc-toggle">
+                                            <div className={`calc-option ${wizardCalcMode === 'forward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('forward')}>לפי תאריך התחלה</div>
+                                            <div className={`calc-option ${wizardCalcMode === 'backward' ? 'active' : ''}`} onClick={() => setWizardCalcMode('backward')}>לפי תאריך סיום</div>
                                         </div>
                                     </div>
                                     {templateMeta.showNameField && (
@@ -1087,49 +1121,29 @@
                     )}
                     <div className="workspace" onMouseMove={handleEditorMouseMove} onMouseUp={handleEditorMouseUp}>
                         {isProcessing && <div className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center flex-col text-white"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-gold mb-4"></div><span className="font-bold">{processingMsg}</span></div>}
-                        {appMode === 'preview' && schedule && schedule.pages.map((sheet, sIdx) => (
-                            <div key={sheet.pageId || sIdx} className="sheet-scale" style={{ transform: `scale(${previewScale})`, transformOrigin: 'top center', marginBottom: `calc(${297 * previewScale}mm - 297mm + 20px)` }}>
-                                <article className="sheet" data-calc-mode={schedule.mode}>
-                                    <header className="sheet-head">
-                                        <h1>דף היומי במשניות</h1>
-                                        <h2>דף ליום - ש״ס משניות בשנה</h2>
-                                        <p className="sheet-range">לימוד מיום <b data-role="start">{schedule.startText}</b> עד יום <b data-role="end">{schedule.endText}</b></p>
-                                    </header>
-                                    <div className="sheet-grid">
-                                        {sheet.columns.map((col, colIdx) => (
-                                            <section className="study-card" key={colIdx} data-month={col.month}>
-                                                <div className="study-month"><span className="month-k">חודש</span><span>{col.month}</span></div>
-                                                <div className="study-head"><span>תאריך</span><span>מ</span><span>עד</span></div>
-                                                <div className="study-body">
-                                                    {col.dates.map((d, r) => (
-                                                        <div className="study-row" key={r}>
-                                                            <div className="study-date" data-date={d}>{d}</div>
-                                                            <div className="study-cell"><img src={col.fromSrc[r]} alt="" /></div>
-                                                            <div className="study-cell"><img src={col.toSrc[r]} alt="" /></div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </section>
-                                        ))}
-                                    </div>
-                                    <footer className="sheet-foot">
-                                        <div className="dedic">
-                                            <span>{schedule.dedication.before}</span>
-                                            <span className="who" data-role="name">{schedule.name || '\u00a0'}</span>
-                                            {schedule.dedication.after ? <span>{schedule.dedication.after}</span> : null}
-                                        </div>
-                                        {sheet.footerSrc ? <img className="sheet-footer-img" src={sheet.footerSrc} alt="" /> : null}
-                                    </footer>
-                                </article>
-                            </div>
-                        ))}
-                        {appMode !== 'preview' && pages.map((page, pIdx) => (
+                        {pages.map((page, pIdx) => (
                             <div key={page.id} className="page-wrapper" style={{ transform: `scale(${previewScale})`, transformOrigin: 'top center', marginBottom: `calc(${297 * previewScale}mm - 297mm + 20px)` }}>
                                 <div id={`page-${page.id}`} className="page-container" onMouseDown={(e) => { if(appMode === 'editor' && !dragInfo) { activePageRef.current = page.id; const rect = e.currentTarget.getBoundingClientRect(); setSelection({ startX: (e.clientX - rect.left) / previewScale, startY: (e.clientY - rect.top) / previewScale, currentX: (e.clientX - rect.left) / previewScale, currentY: (e.clientY - rect.top) / previewScale }); } }}>
                                     <img src={page.image} className="pdf-bg-img" alt={`Page ${pIdx+1}`} />
                                     <div className={`interaction-layer ${appMode === 'editor' ? 'edit-mode' : 'view-mode'}`}>
                                         {page.tables.map(t => {
                                             const cW = t.w / t.cols, cH = t.h / t.rows;
+                                            if (appMode === 'preview') {
+                                                return (
+                                                    <div key={t.id} className="slot-grid" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px`, gridTemplateColumns: `repeat(${t.cols}, 1fr)`, gridTemplateRows: `repeat(${t.rows}, 1fr)` }}>
+                                                        {Array.from({length: t.rows}).map((_, r) => Array.from({length: t.cols}).map((_, c) => {
+                                                            const id = `${t.id}_${r}_${c}`;
+                                                            const text = data[id] || "";
+                                                            const style = cellStyles[id] || {};
+                                                            const weight = style.fontWeight || 700;
+                                                            const maxPx = parseFloat(style.fontSize) || 8;
+                                                            const px = fitPx(text, cW, cH, maxPx, weight);
+                                                            const role = style.fontSize === '7.5px' ? 'date' : style.fontSize === '9px' ? 'month' : style.fontSize === '11px' ? 'range' : style.fontSize === '13px' ? 'name' : '';
+                                                            return <div key={id} className="slot-cell" data-role={role || undefined} data-date={role === 'date' ? text : undefined} style={{ fontWeight: weight }}><span style={{ fontSize: px + 'px' }}>{text}</span></div>;
+                                                        }))}
+                                                    </div>
+                                                );
+                                            }
                                             return (
                                                 <div key={t.id} className="grid-container" style={{ left: `${t.x}px`, top: `${t.y}px`, width: `${t.w}px`, height: `${t.h}px` }}>
                                                     {appMode === 'editor' && (
@@ -1140,7 +1154,7 @@
                                                     )}
                                                     {Array.from({length: t.rows}).map((_, r) => Array.from({length: t.cols}).map((_, c) => {
                                                         const id = `${t.id}_${r}_${c}`;
-                                                        return <input key={id} className="cell-input" style={{ right: `${c * cW}px`, top: `${r * cH}px`, width: `${cW}px`, height: `${cH}px`, ...(cellStyles[id] || {}), pointerEvents: appMode === 'preview' ? 'none' : 'auto' }} readOnly={appMode === 'preview'} value={data[id] || ""} onChange={(e) => setData({...data, [id]: e.target.value})} autoComplete="off" />;
+                                                        return <input key={id} className="cell-input" style={{ right: `${c * cW}px`, top: `${r * cH}px`, width: `${cW}px`, height: `${cH}px`, ...(cellStyles[id] || {}) }} value={data[id] || ""} onChange={(e) => setData({...data, [id]: e.target.value})} autoComplete="off" />;
                                                     }))}
                                                 </div>
                                             );
