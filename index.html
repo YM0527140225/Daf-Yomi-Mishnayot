@@ -1046,6 +1046,7 @@
 
             const [dragInfo, setDragInfo] = useState(null);
             const activePageRef = useRef(null);
+            const templateRef = useRef({ data: {}, styles: {} });
             const [newTableConfig, setNewTableConfig] = useState({ rows: 30, cols: 4 });
 
             const [deceasedName, setDeceasedName] = useState("");
@@ -1114,7 +1115,8 @@
 
             const loadJson = (json) => {
                 if (json.version === 2 && json.pages) { 
-                    setPages(json.pages); 
+                    setPages(json.pages);
+                    templateRef.current = { data: json.data || {}, styles: json.styles || {} };
                     setData(json.data || {}); 
                     setCellStyles(json.styles || {});
                     if (json.meta) {
@@ -1179,8 +1181,8 @@
                         alert("התאריך שנבחר אינו קיים בלוח העברי");
                         return;
                     }
-                    const newData = { ...data };
-                    const newStyles = { ...cellStyles };
+                    const newData = { ...templateRef.current.data };
+                    const newStyles = { ...templateRef.current.styles };
                     const stylesMap = { 
                         name: { fontSize: '13px', fontWeight: '800', textAlign: 'center' }, 
                         month: { fontSize: '9px', fontWeight: '700', textAlign: 'right' }, 
